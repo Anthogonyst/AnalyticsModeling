@@ -1,0 +1,515 @@
+---
+title: "Crime Logistical Model, Homework #3, Group #5"
+author: "Anthony A, Alice A. Friedman, Seung min song, Charles Ugiabe"
+date: "`r format(Sys.time(), '%m/%d/%Y')`"
+output: 
+  pdf_document:
+    pandoc_args: --listings
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r libraries, include=FALSE, warning=FALSE, class.output="scroll-less"}
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(MASS)
+library(dbplyr)
+library(caret)
+library(lattice)
+library(purrr)
+library(kableExtra)
+library(ellipse)
+library(RColorBrewer)
+invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source))
+```
+
+# Abstract
+
+We will evaluate data related to neighborhood crime to create a model to predict if a neighborhood is "high crime," which we are defining as above the median crime rate. To do this, we will create a logistical model that rates each neighborhood's crime level.
+
+# Data Exploration
+
+The data has 12 features and the training data set additionally has 1 target variable, which marks neighborhoods as "high crime" (target==1) or not high crime (target==0).
+
+- zn: proportion of residential land zoned for large lots (over 25000 square feet) 
+- indus: proportion of non-retail business acres per suburb 
+- chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) 
+- nox: nitrogen oxides concentration (parts per 10 million) 
+- rm: average number of rooms per dwelling 
+- age: proportion of owner-occupied units built prior to 1940 
+- dis: weighted mean of distances to five Boston employment centers 
+- rad: index of accessibility to radial highways 
+- tax: full-value property-tax rate per $10,000 
+- ptratio: pupil-teacher ratio by town 
+- lstat: lower status of the population (percent) 
+- medv: median value of owner-occupied homes in $1000s 
+- target: whether the crime rate is above the median crime rate (1) or not (0)
+
+## Assumptions for Logistical Regression
+
+When we do logistical regression, we have to consider our assumptions and then verify our data holds up to them. The assumptions necessary for logistical regression are:
+
+1. Binary outcome. The model will predict only "yes" or "no". This assumption is met as we are predicting only "high crime" or "not high crime" rather than any particular level of crime.
+
+2. No multicollinearity between features: The features should be independent of each other.
+
+3. Independent observations: The values in any one observation should not affect the values in any other. In practice, this is not likely to be strictly true as being *near* a high crime neighborhood should certainly affect the crime levels of other neighborhoods. However, this is an assumption we will have to say is "true enough" for the purpose of this model.
+
+4. Features are linearly related to the log-odds of the target variable. Note that this does not mean the the features are linearly related to the target itself, as with linear regression.
+
+5. Large sample size: Our minimum sample size at n% probability would be 10*13/n so our sample size is adequate (466 > 260) where 50% of samples are expected to be over the median by definition.
+
+6. No outliers: Outliers can have a significant distorting effect in logistic regression, and so should typically be removed before building the model. 
+
+Going forward, for our research question we ask "is the crime present in this neighborhood above the median rate?"
+
+```{r, include=FALSE, echo=FALSE}
+dataUrl = "https://github.com/Anthogonyst/AnalyticsModeling/tree/master/data"
+
+all_train_raw = LoadDataElseWeb("crime-training-data_modified.csv", dataUrl)
+all_test = LoadDataElseWeb("crime-evaluation-data_modified.csv", dataUrl)
+```
+
+```{r, include=FALSE, echo=FALSE}
+RenameCrime <- function(df){
+  df <- df %>% 
+    dplyr::rename(
+      `Large Lot Zoning` = zn,
+      `Prop. Industrial Zoning` = indus,
+      `Borders Charles` = chas,
+      `Nitrous Oxide (pp million unit)` = nox, 
+      `Avg Rooms per Dwelling` = rm,
+      `Prop. Owner-Occupied Units Built Prior to 1940` = age, 
+      `Weighted Mean of Distances to Five Boston Employment Centers` = dis,
+      `Index of Accessibility to Radial Highways` = rad, 
+      `Property-Tax Rate per $10k` = tax, 
+      `Pupil-Teacher Ratio` = ptratio, 
+      `Percent Pop. Lower SES` = lstat,
+      `Median Value of Owner-Occupied Homes (in $1000s)` = medv, 
+      `High Crime Status` = target
+    )
+  return(df)
+}
+
+dplyr::glimpse(RenameCrime(all_train_raw))
+```
+
+## Summary Statistics
+
+Upon analyzing the target variable, we observe that 237 out of the total observations have a crime rate below the median, whereas 229 have a crime rate above the median. Consequently, our training data set comprises an almost equal number of neighborhoods categorized as at-risk and not-at-risk.
+
+```{r}
+summary(all_train_raw)
+```
+
+## Correlation
+
+Our first curiosity is if there is any strong correlation to the target variable.
+Accordingly, the `nox`, `age`, `rad`, `tax`, and `indus` variables show moderate positive correlation with the target (>0.6).
+Additionally, the `dis` variable shows moderate negative correlation with the target(< -0.6).
+
+```{r}
+cor_matrix <- stats::cor(all_train_raw)
+cor_with_target <- cor_matrix["target", colnames(cor_matrix) != "target"]
+cor_with_target %>% kableExtra::kable()
+```
+
+However, to verify our assumptions to run logistical regression, we also need to verify that there is no multicollinearity.
+According to our visualization of the correlation matrix below, there are several variables that appear to be collinear (|correlation| > 0.7):
+
+This will need to be dealt with before proceeding with model development.
+
+```{r}
+#add color palette
+PlotCorrEllipse <- function(corData, pal = RColorBrewer::brewer.pal(5, "Spectral"),
+                            highlight = c("both", "positive", "negative")[1], hiMod = 1) {
+  colorRange = 100
+  coloredVals = corData*50 + 50
+  skewRange = max(min(hiMod[[1]], 2), 0)
+  
+  if (is.numeric(pal)) {
+    warning("Passed number as argument for palette. It works but was this intentional?")
+  }
+  if (skewRange != hiMod) {
+    warning("Color range skew only allowed between 0 and 2 where 0.5*n% of value range are colored.  cor(X) C [-1, 1]")
+  }
+  if (highlight[[1]] == "positive") {
+    colorRange = 50 * skewRange
+    coloredVals = 1 - corData*50 + 50
+  }
+  if (highlight[[1]] == "negative") {
+    colorRange = 50 * skewRange
+    coloredVals = corData*50 + 50
+  }
+  
+  ellipse::plotcorr(corData, mar = c(1,1,1,1),
+                    col = grDevices::colorRampPalette(pal)(colorRange)[coloredVals])  
+  
+}
+
+PlotCorrEllipse(cor_matrix)
+cor_matrix %>% kableExtra::kable()
+
+```
+
+## Data structure
+
+There are 466 observations and 13 variables in the training dataset. 
+
+
+## Missing values
+
+The dataset is complete with no missing values, so imputation is not necessary on this dataset.
+
+```{r, include=FALSE, echo=FALSE}
+nrow(all_train_raw[is.na(all_train_raw),])
+```
+
+## Visulization of the data set
+
+Let's examine what the data looks like without separating the target variables.
+At first, we notice that `indus` and `rad` appear binomial.
+Additionally, `age` and `nox` seem to be skewed in one direction.
+We do not have to normalize the data until necessary because it is not a necessary condition for logistical regression.
+
+```{r}
+datasub = reshape2::melt(all_train_raw, id=c("target"))
+ggplot2::ggplot(datasub) +
+  ggplot2::aes(x = value) + 
+  ggplot2::geom_density(fill = "skyblue") + 
+  ggplot2::facet_wrap(~variable, scales = 'free') 
+```
+
+Next, let's examine the distribution of the features with respect to the target variable.
+Shown below, in light blue are the distributions of the features where crime is high (`target` is 1), and in dark blue are the distributions where crime is low. 
+
+Noticeably, some features strongly show a difference between the two plots, such as `indus` whereas others are more similar. We should expect all of the models to weigh `indus` heavily.
+
+Additionally, we can expect other features with notable differences to get weighed with some significance such as `nox` and `lstat` and `rad`.
+Features like `chas`, where the distributions are nearly identical, are not likely targets for the model.
+This makes sense, as there is no obvious causal reason why bordering the Charles River should affect crime.
+
+```{r}
+ggplot2::ggplot(datasub) +
+  ggplot2::aes(x = "", y = value, group = target, fill = target) +
+  ggplot2::geom_violin(adjust = 1L, scale = "area") +
+  ggplot2::coord_flip() +
+  ggplot2::theme_minimal() +
+  ggplot2::facet_wrap(ggplot2::vars(variable), scales = "free")
+```
+
+# Data Preparation
+
+As both `chas` and `target` are categorical variables, we have changed their class from integer to factor.
+
+```{r}
+all_train <- all_train_raw
+all_train$chas <- as.factor(all_train$chas)
+all_train$target <- as.factor(all_train$target)
+```
+
+## Cross Validation
+
+To verify our results, we will split the available labeled data into training and validation sets.
+This will help us score our model on test data and to be able to verify the results later.
+
+## Outliers
+
+Based on the analysis above, there were no outliers that needed to be removed as all the values appeared to be reasonable.
+
+## Buckets
+
+The code is using the summary information provided above to transform the data by putting it into "buckets" or categories.
+The variable `cols_to_bin` contains the names of the columns in the data set that we want to bin, and breaks contains the breaks for the buckets we want to use for each variable.
+
+```{r}
+
+cols_to_bin <- c("zn", "indus", "nox", "rm", "age", "dis", "rad","tax", "ptratio", "lstat", "medv")
+
+# create the breaks for the buckets
+breaks <- list(zn = c(0, 20, 40, 60, 80, 100),
+               indus = c(0, 5, 10, 15, 20, 30),
+               nox = c(0, 0.4, 0.5, 0.6, 0.7, 0.9),
+               rm = c(0, 4, 5, 6, 7, 8, 9),
+               age = c(0, 20, 40, 60, 80, 100),
+               dis = c(0, 2, 4, 6, 8, 10, 12),
+               rad = c(0, 5, 10, 15, 20, 25, 30),
+               tax = c(0, 250, 500, 750, 1000),
+               ptratio = c(0, 14, 16, 18, 20, 22),
+               lstat = c(0, 5, 10, 15, 20, 25, 30, 40),
+               medv = c(0, 10, 20, 30, 40, 50))
+
+# loop through columns, bin data, and print frequency table
+for (col in cols_to_bin) {
+  binned_col <- cut(all_train[[col]], breaks = breaks[[col]], include.lowest = TRUE)
+  binned_col <- as.data.frame(binned_col) # convert factor to data frame
+  colnames(binned_col) <- col # set the column name to the variable name
+  print(table(binned_col))
+}
+```
+
+## New Variables
+
+**tax_per_room (tpr)** variable would represent the insights into the relationship between the cost of living in a particular area and the size of the living space. A higher value of **tax_per_room (tpr)** means that the tax rate is higher relative to the number of rooms in the dwelling.
+
+**age_dis_ratio(adr)** can help identify areas that have an older housing inventory and are farther from job centers, which may affect preference for those locations.
+
+```{r}
+all_train <- all_train %>%
+  dplyr::mutate(tpr = tax / rm,
+                adr = age / dis)
+
+head(all_train)
+```
+
+```{r}
+train_clean_pre <- all_train 
+set.seed(121)
+split <- caret::createDataPartition(train_clean_pre$target, p=0.80, list=FALSE)
+train_clean <- train_clean_pre[split, ]
+validation <- train_clean_pre[ -split, ]
+```
+
+# Logistical Model Building
+
+To begin, we will create a null model that does not make any prediction.
+This will help us verify our first model works better than random guessing.
+Therefore, the first model that beats the residual deviance of 646 will be our first model candidate.
+
+```{r nullModel}
+lmNull = rep(0, nrow(all_train["target"])) %>%
+  { .[1] = 1 ; . } %>%
+    as.factor(.) %>%
+      cbind(., all_train["target"]) %>%
+        magrittr::set_colnames(., c("X", "target")) %>%
+          stats::glm(target ~ NULL, data = ., family = 'binomial')
+
+stats::summary.glm(lmNull)
+```
+
+## Model 1 - Full Model
+
+We will start with a top-down approach and begin by including all of the variables. 
+
+According to this, our most statistically consistent variables are those with extremely low p-values. Notably, the variables `nox` and `rad` both have very high significance below 0.001 so we will definitely use these in the future. This is expected based on their distributions with respect to the target variable, above.
+
+Thankfully, the AIC and residual deviance are better than the null model already, so we are off to a good start.
+
+Multicollinearity will impact our ability to evaluate the impact of any one variable, and because there is known multicollinearity among the feature set, we will want a model with fewer or combined features as our final model in order to understand the relationship between the features and crime levels better.
+
+
+```{r, warning=FALSE}
+modelOne <- stats::glm(target ~ ., data = train_clean, family="binomial")
+summary(modelOne) 
+
+#make predictions
+probabilities1 <- modelOne %>% stats::predict(validation, type = "response")
+predicted.classes1 <- ifelse(probabilities1 > 0.5, 1, 0) %>% as.factor()
+# Model accuracy
+confusionMatrix(predicted.classes1, validation$target)
+```
+
+## Model 2 - Selection by P-Values and Multicollinearity
+
+As described above, and as expected given known real-world relationships between things like proximity to highways and air pollution, there are several variable combinations with high collinearity:
+
+* `tax` and `rad` (corr > 0.90 -- very high!) 	
+* `nox` and `dis` (corr > 0.76)
+* `age` and `dis` (corr > 0.75)
+* `indus` and `nox` (corr > 0.75)
+* `indus` and `tax` (corr > 0.73)
+* `nox` and `age` (corr > 0.73)
+* `indus` and `dis` (cor > 0.70)
+* `medv` and `room` (cor > 0.70)
+
+One approach could be to simply drop `tax` as a feature as it is highly correlated with more than one other feature in the data set. Another option is linearly combine highly correlated variables into a single variable.
+
+Before we begin stepwise addition and subtraction, let's also run a model with only variables with significance below 0.1 value.  Conveniently, this approach also eliminates several of the suspect variable combinations; however we are still left with 
+
+* `nox` and `age` (corr > 0.73)
+
+Age of homes should not be directly causally related to air quality for any conceivable reason, and so this may be a spurious association, like Nick Cage movies and swimming pool accidents. We will therefore leave that one in.
+ 
+We expect that the previously strong features will persist but the weaker features may undergo interesting changes.
+
+This model has a slightly lower accuracy than the full model, but it's very close -- indicating that we didn't lose a lot of predictive value in reducing the feature set quite significantly.
+
+
+```{r, warning = FALSE}
+modelTwo <- stats::glm(
+  target ~ nox + age + rad + tax + ptratio + medv + adr, 
+  data = train_clean, 
+  family="binomial")
+
+summary(modelTwo) 
+
+probabilities2 <- modelTwo %>% stats::predict.glm(validation, type = "response")
+predicted.classes2 <- ifelse(probabilities2 > 0.5, 1, 0) %>% as.factor()
+# Model accuracy
+confusionMatrix(predicted.classes2, validation$target)
+```
+
+## Model 3 - Backward Selection from Full Model
+
+Next, let's use the AIC scoring mechanism to do stepwise subtraction.
+This will give us a subset of variables at a local maximum.
+Generally speaking, it's difficult to find an absolute maximum but random search helps.
+Therefore, we will keep this local maximum that we obtain from stepwise selection on the full model. 
+
+Interestingly, this provides us with the same model as Model 2!
+
+```{r}
+modelThree <- glm(target ~., data = train_clean, family = "binomial") %>% 
+  MASS::stepAIC(direction = "backward", trace = FALSE)
+
+summary(modelThree)
+
+probabilities3 <- modelThree %>% stats::predict(validation, type = "response")
+predicted.classes3 <- ifelse(probabilities3 > 0.5, 1, 0) %>% as.factor()
+# Model accuracy
+confusionMatrix(predicted.classes3, validation$target)
+
+```
+
+## Model 4 - Forward & Backward Stepwise from No Features
+
+Finally, let's use that same AIC scoring mechanism to do forward stepwise addition.
+This will reduce some of the extra variables we added while still constraining ourselves to the most optimal fit.
+Notably, when we run forward selection on our previous model, it reaches the same step previously and stops.
+Therefore, let's instead run it from a no feature model. As shown below, this is the same resulting model with one feature, `nox`.
+
+```{r}
+# I don't think the forward step was working -- I couldn't get it to trace any changes, but both seems to work
+modelFour <- modelOne %>% MASS::stepAIC(direction = "both", trace=FALSE)
+summary(modelFour)
+
+probabilities4 <- modelFour %>% stats::predict(validation, type = "response")
+predicted.classes4 <- ifelse(probabilities4 > 0.5, 1, 0) %>% as.factor()
+# Model accuracy
+confusionMatrix(predicted.classes4, validation$target)
+
+```
+
+# Model Selection
+
+We previously realized that our models beat the null hypothesis so now we have some potentially successful models.
+To compare logistical models, we can assess accuracy, precision, deviance, AIC, and so on. We will also consider practicalities -- all else being equal, a model wiht fewer features is cheaper to run and easier to explian and maintain.
+
+It's not clear whether we should prefer precision or specificity here so we will use the derived F1 metric.
+
+First, we will do chi square testing to prove the statistical validity of the models and then look at F1 to replace old models.
+
+```{r, include=FALSE}
+MakePredictions <- function(model, testData, excludeCol = "target", threshold = 0.5) {
+  probability = stats::predict(model, testData[, ! colnames(testData) %in% excludeCol])
+  class = probability %>%
+    { .[. > threshold] = 1 ; . } %>%
+      { .[. <= threshold] = 0 ; . } %>%
+        as.factor(.)
+
+  data.frame(class, probability)
+}
+
+VerifyKfold <- function(model, testData, excludeCol = "target", threshold = 0.5) {
+  MakePredictions(model, testData, excludeCol, threshold) %>%
+    { caret::confusionMatrix(.$class, testData[, colnames(testData) %in% excludeCol], mode = "everything") }
+}
+
+ValidationPipeline <- function(model, testData, excludeCol, plotname = "", threshold = 0.5) {
+  p = MakePredictions(model, testData, excludeCol)
+  d = VerifyKfold(model, testData, excludeCol)
+  g = graphics::fourfoldplot(d$table, color = c("#B22222", "#2E8B57"), main = plotname)
+  
+  print(formula(model))
+  print(d)
+  print(g)
+  
+  invisible(list(p, d, g))
+}
+
+CompareModelStats <- function(testData, excludeCol = "target", ..., threshold = 0.5) {
+  models = list(...)
+  
+  # sapply(models, function(x) {
+  #   as.numeric(MakePredictions(x, validation, targetCol)$class == validation[[targetCol]])
+  # })
+  lapply(models, VerifyKfold, testData, excludeCol, threshold) %>%
+    lapply(., function(x) {
+      c(x$byClass["F1"], x$overall["Accuracy"], x$table[1, 1], x$table[1, 2], x$table[2, 1], x$table[2, 2]) %>%
+        magrittr::set_names(., c("F1", "Accuracy", "TP", "FP", "FN", "TN"))
+    }) %>%
+      do.call(rbind, .)
+}
+```
+
+Accordingly, the residual deviance for the full model is 172.
+The next two models have 0.34 and 0.066 significance value.
+Since our alpha value is 0.05, these two models are not significant enough to replace the old model.
+The last model's p value is low enough to be relevant but the residual deviance is too high to warrant replacing it.
+Therefore, model 1 is our final model.
+
+```{r}
+stats::anova(test = "Chisq", modelOne, modelTwo, modelThree, modelFour)
+```
+
+These are the statistics for all of the models in case we were curious.
+We would use this table to verify the F1 value if a new model were to pass the previous tests.
+
+```{r}
+CompareModelStats(validation, "target", modelOne, modelTwo, modelThree, modelFour)
+```
+
+Because the predicted values are ultimately the same across models, the selected model is the one with fewer features, which is Model 2.
+
+Shown below is a tabulated form and visualization of our final model.
+
+```{r}
+ValidationPipeline(modelTwo, validation, "target", "Model 2")
+```
+
+## Selected Model Predicted Vs. Actual
+Shown below are the predictions for each neighborhood based on the final model.
+
+```{r, predict}
+Prediction <- predicted.classes2
+Actual <- validation$target
+Probability <- probabilities2
+
+print(data.frame(Prediction, Probability, Actual))
+
+```
+
+# Conclusions and Final Thoughts
+
+In the real world, accuracy, specificity, and sensitivity are all factors worth considering, but so, too, is the cost to gather and host input data and the processing time to run complex models. Because these factors are important, we have selected a simpler model than one which provides slightly superior results.
+
+All of our models highly select for nitrogen oxide concentration (`nox`) so we assume that it is a byproduct of population. Additional indicators of poverty are a low number of rooms per dwelling (`rm`) and apparently distance to an accessible highway (`rad`) is also another. Part of our responsibility to our community is giving the proper equity so that logistical means for garbage cleaning and public transportation are accounted for.
+
+
+# References
+
+Datasets are provided by CUNY School of Professional Studies for academic purposes.
+It is reflective of public data gathered online.
+
+# Appendix
+
+Shown here is a copy of all relevant R code.
+
+```{r, echo=TRUE, class.output="foldable"}
+MakePredictions
+```
+
+```{r, echo=TRUE, class.output="foldable"}
+VerifyKfold
+```
+
+```{r, echo=TRUE, class.output="foldable"}
+ValidationPipeline
+```
+
+```{r, echo=TRUE, class.output="foldable"}
+PlotCorrEllipse
+```
