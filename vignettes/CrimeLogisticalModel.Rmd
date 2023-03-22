@@ -31,11 +31,6 @@ To do this, we will create a logistical model that rates either true or false.
 This information is necessary to determine if a neighborhood is going through difficult times or is over-policed by authorities.
 As such, our approach attempts to find a non-biased answer based on what is known.
 
-# Datasets
-
-Datasets are provided by CUNY School of Professional Studies for academic purposes.
-It is reflective of public data gathered online.
-
 # Data Exploration
 
 The data has 12 features and 1 target variable.
@@ -405,4 +400,27 @@ prediction = as.factor(prediction)
 prediction
 ```
 
+# Conclusions and Final Thoughts
 
+None at all.
+
+# References
+
+Datasets are provided by CUNY School of Professional Studies for academic purposes.
+It is reflective of public data gathered online.
+
+# Appendix
+
+Shown here is a copy of all relevant R code.
+
+```{r, class.output="foldable"}
+MakePredictions
+```
+
+```{r, class.output="foldable"}
+VerifyKfold
+```
+
+```{r, class.output="foldable"}
+getROC
+```
