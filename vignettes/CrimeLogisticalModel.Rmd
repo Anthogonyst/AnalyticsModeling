@@ -50,11 +50,16 @@ eval <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/ma
 ## Data structure
 
 There are 466 observations and 13 variables in the training dataset.
+Additionally, there are no missing values so imputation is not necessary on this dataset.
+Shown below is a sample of its head.
 
 ```{r}
 str(all_train)
 ```
 
+```{r, include=FALSE}
+nrow(all_train[is.na(all_train),])
+```
 
 ```{r}
 #Since variables chas and target are categorical, we are going to change their class from integer to factor:
@@ -69,21 +74,19 @@ Let’s look at the data structure again:
 library(dplyr)
 glimpse(all_train)
 ```
-Summary Statistics
-Looking at the target variable, we see 237 observations are below the median crime rate and 229 are above the median crime rate, 
-thus we have roughly the same number of at risk and not-at-risk neighborhoods in our training data set.
+
+## Summary Statistics
+
+Looking at the target variable, we see 237 observations are below the median crime rate and 229 are above the median crime rate. 
+Thus we have roughly the same number of at risk and not-at-risk neighborhoods in our training data set.
+This is good because it means that our classes are evenly balanced for our model.
 
 ```{r}
 summary(all_train)
 ```
 
-Missing values
-How many rows of data have NA values? 0 rows, thus there are no missing values in the dataset.
+## Visulization of the data set
 
-```{r}
-nrow(all_train[is.na(all_train),])
-```
-Visulization of the data set
 Let’s first look at the density plots of the numerical variables to view their shapes and distributions:
 
 ```{r}
@@ -94,11 +97,13 @@ ggplot(datasub, aes(x = value)) +
     geom_density(fill = "blue") + 
     facet_wrap(~variable, scales = 'free') 
 ```
+
 For categorial variable chas, we can look at a confusion matrix table to make sure that we have enough observations for all levels:
 
 ```{r}
 xtabs(~ target + chas, data=all_train)
 ```
+
 Then we will look at the boxplots of the numerical variables in relationship to target variable:
 
 ```{r}
@@ -106,10 +111,11 @@ ggplot(datasub, aes(x = target, y = value)) +
     geom_boxplot() + 
     facet_wrap(~variable, scales = 'free') 
 ```
-2. DATA PREPARATION
-Describe how you have transformed the data by changing the original variables or creating new variables. If you did transform the data or create new variables, discuss why you did this.
 
-Outlier Imputation
+# Data Preparation
+
+## Outlier Imputation
+
 From the boxplots above, we can see there are many outliers so we are going to fix them by replacing with medians.
 
 ```{r}
