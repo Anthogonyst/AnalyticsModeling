@@ -56,7 +56,6 @@ glimpse(all_train)
 ## Summary Statistics
 
 Upon analyzing the target variable, we observe that 237 out of the total observations have a crime rate below the median, whereas 229 have a crime rate above the median. Consequently, our training data set comprises an almost equal number of neighborhoods categorized as at-risk and not-at-risk.
-
 ```{r}
 summary(all_train)
 ```
