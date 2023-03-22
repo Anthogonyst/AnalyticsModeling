@@ -81,12 +81,6 @@ all_train$chas <- as.factor(all_train$chas)
 all_train$target <- as.factor(all_train$target)
 ```
 
-Let’s look at the data structure again:
-
-```{r}
-glimpse(all_train)
-```
-
 ## Summary Statistics
 
 Looking at the target variable, we see 237 observations are below the median crime rate and 229 are above the median crime rate. 
