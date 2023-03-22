@@ -262,73 +262,115 @@ summary(modelFive)
 
 # Model Selection
 
-```{r}
-preds1 =predict(logMod1, newdata = validation)
-preds2 =predict(logMod2, newdata = validation)
-preds3 =predict(logMod3, newdata = validation)
-preds1[preds1 >= 0.5] <- 1
-preds1[preds1 < 0.5] <- 0
-preds1 = as.factor(preds1)
-preds2[preds2 >= 0.5] <- 1
-preds2[preds2 < 0.5] <- 0
-preds2 = as.factor(preds2)
-preds3[preds3 >= 0.5] <- 1
-preds3[preds3 < 0.5] <- 0
-preds3 = as.factor(preds3)
-```
+Our first model for consideration is the full model.
 
+```{r, include=FALSE}
+MakePredictions <- function(model, testData, excludeCol = "target", threshold = 0.5) {
+  probability = stats::predict(model, testData[, ! colnames(testData) %in% excludeCol])
+  class = probability %>%
+    { .[. > threshold] = 1 ; . } %>%
+      { .[. <= threshold] = 0 ; . } %>%
+        as.factor(.)
 
-```{r}
-m1cM <- confusionMatrix(preds1, validation$target, mode = "everything")
-m2cM <- confusionMatrix(preds2, validation$target, mode = "everything")
-m3cM <- confusionMatrix(preds3, validation$target, mode = "everything")
-```
+  data.frame(class, probability)
+}
 
-```{r}
-formula(modelTwo) # Model 1 formula
-```
+VerifyKfold <- function(model, testData, excludeCol = "target", threshold = 0.5) {
+  MakePredictions(model, testData, excludeCol, threshold) %>%
+    { caret::confusionMatrix(.$class, testData[, colnames(testData) %in% excludeCol], mode = "everything") }
+}
 
-```{r}
-fourfoldplot(m1cM$table, color = c("#B22222", "#2E8B57"), main="Model 1")
-```
+ValidationPipeline <- function(model, testData, excludeCol, plotname = "", threshold = 0.5) {
+  p = MakePredictions(model, testData, excludeCol)
+  d = VerifyKfold(model, testData, excludeCol)
+  g = graphics::fourfoldplot(d$table, color = c("#B22222", "#2E8B57"), main = plotname)
+  
+  print(formula(model))
+  print(d)
+  print(g)
+  
+  invisible(list(p, d, g))
+}
 
-```{r}
-formula(modelThree) # Model 2 formula
-```
-
-```{r}
-fourfoldplot(m2cM$table, color = c("#B22222", "#2E8B57"), main="Model 2")
+ValidationPipeline(modelOne, validation, "target", "Model 1")
 ```
 
 ```{r}
-formula(modelFour) # Model 3 formula
+formula(modelOne)
+predictions = MakePredictions(modelOne, validation, "target")
+cv1 = VerifyKfold(modelOne, validation, "target")
+cv1
+graphics::fourfoldplot(cv1$table, color = c("#B22222", "#2E8B57"), main="Model 1")
 ```
 
+Our second model for consideration is the manually selected p values model.
+
 ```{r}
-fourfoldplot(m3cM$table, color = c("#B22222", "#2E8B57"), main="Model 3")
+formula(modelTwo)
+cv2 = VerifyKfold(modelTwo, validation, "target")
+cv2
+graphics::fourfoldplot(cv2$table, color = c("#B22222", "#2E8B57"), main="Model 2")
 ```
+
+Our third model is the AIC backwards selection model.
+
+```{r}
+formula(modelThree)
+cv3 = VerifyKfold(modelThree, validation, "target")
+cv3
+graphics::fourfoldplot(cv3$table, color = c("#B22222", "#2E8B57"), main="Model 2")
+```
+
+Our fourth model is the AIC forwards selection model from model two, nicknamed 2-F in comparison to the next model.
+
+```{r}
+formula(modelFour)
+cv4 = VerifyKfold(modelThree, validation, "target")
+cv4
+graphics::fourfoldplot(cv4$table, color = c("#B22222", "#2E8B57"), main="Model 2", space = 0.4)
+```
+
+Our fifth model is the AIC forwards selection model from model one, nicknamed 1-F in comparison to the previous model.
+
+```{r}
+formula(modelThree)
+cv5 = VerifyKfold(modelThree, validation, "target")
+cv5
+graphics::fourfoldplot(cv5$table, color = c("#B22222", "#2E8B57"), main="Model 2")
+```
+
 
 accuracy and lower error rate
 
 ```{r}
-temp <- data.frame(m1cM$overall, 
-                   m2cM$overall, 
-                   m3cM$overall) %>%
+temp <- data.frame(cv1$overall,
+                   cv2$overall,
+                   cv3$overall,
+                   cv4$overall,
+                   cv5$overall) %>%
   t() %>%
   data.frame() %>%
   dplyr::select(Accuracy) %>%
-  mutate(Classification_Error_Rate = 1-Accuracy)
-Summ_Stat <-data.frame(m1cM$byClass, 
-                   m2cM$byClass, 
-                   m3cM$byClass) %>%
+  mutate(Classification_Error_Rate = 1 - Accuracy)
+Summ_Stat <- data.frame(cv1$byClass,
+                        cv2$byClass,
+                        cv3$byClass,
+                        cv4$byClass,
+                        cv5$byClass) %>%
   t() %>%
   data.frame() %>%
   cbind(temp) %>%
-  mutate(Model = c("Model 1", "Model 2", "Model 3")) %>%
-  dplyr::select(Model, Accuracy, Classification_Error_Rate, Precision, Sensitivity, Specificity, F1) %>%
-  mutate_if(is.numeric, round,3)# %>%
-  #kable('html', escape = F) %>%
-  #kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),full_width = F)
+  mutate(Model = c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5")) %>%
+  dplyr::select(Model,
+                Accuracy,
+                Classification_Error_Rate,
+                Precision,
+                Sensitivity,
+                Specificity,
+                F1) %>%
+  mutate_if(is.numeric, round, 3)# %>%
+#kable('html', escape = F) %>%
+#kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),full_width = F)
 Summ_Stat
 ```
 
