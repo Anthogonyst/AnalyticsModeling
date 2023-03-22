@@ -1,0 +1,170 @@
+---
+title: "DATA 621 HW3"
+author: "IvanTikhonov, Seung min song, Alice Friedman, Anthony A"
+output:  
+  pdf_document:
+    toc: true
+  html_document:
+    toc: true
+    toc_float: true
+    show_toggle: true
+  includes:
+  in_header: header.html
+css: ./lab.css
+highlight: pygments
+theme: cerulean
+toc: true
+toc_float: true
+linkcolor: blue
+date: "2023-4-02"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(reshape)
+library(knitr)
+library(data.table)
+options(warn=-1)
+```
+Overview
+In this homework assignment, you will explore, analyze and model a data set containing information on crime
+for various neighborhoods of a major city. Each record has a response variable indicating whether or not the crime
+rate is above the median crime rate (1) or not (0).
+
+Your objective is to build a binary logistic regression model on the training data set to predict whether the
+neighborhood will be at risk for high crime levels. You will provide classifications and probabilities for the
+evaluation data set using your binary logistic regression model.You can only use the variables given to you (or
+variables that you derive from the variables provided). Below is a short description of the variables of interest in
+the data set:
+
+- zn: proportion of residential land zoned for large lots (over 25000 square feet) (predictor variable)
+- indus: proportion of non-retail business acres per suburb (predictor variable)
+- chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) (predictor variable)
+- nox: nitrogen oxides concentration (parts per 10 million) (predictor variable)
+- rm: average number of rooms per dwelling (predictor variable)
+- age: proportion of owner-occupied units built prior to 1940 (predictor variable)
+- dis: weighted mean of distances to five Boston employment centers (predictor variable)
+- rad: index of accessibility to radial highways (predictor variable)
+- tax: full-value property-tax rate per $10,000 (predictor variable)
+- ptratio: pupil-teacher ratio by town (predictor variable)
+- black: 1000(Bk - 0.63)2 where Bk is the proportion of blacks by town (predictor variable)
+- lstat: lower status of the population (percent) (predictor variable)
+- medv: median value of owner-occupied homes in $1000s (predictor variable)
+- target: whether the crime rate is above the median crime rate (1) or not (0) (response variable)
+
+Deliverables:
+
+- A write-up submitted in PDF format. Your write-up should have four sections. Each one is described
+below. You may assume you are addressing me as a fellow data scientist, so do not need to shy away
+from technical details.
+- Assigned prediction (probabilities, classifications) for the evaluation data set. Use 0.5 threshold.
+- Include your R statistical programming code in an Appendix.
+
+# 1. DATA EXPLORATION
+
+Describe the size and the variables in the crime training data set. 
+Consider that too much detail will cause a manager to lose interest while too little detail will make the manager consider that you aren’t doing your job.
+
+## Data acquisition
+
+```{r}
+all_train <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-training-data_modified.csv")
+eval <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-evaluation-data_modified.csv")
+```
+
+Revisit the data structure to gain a better understanding.
+```{r}
+glimpse(all_train)
+```
+
+## Summary Statistics
+
+Upon analyzing the target variable, we observe that 237 out of the total observations have a crime rate below the median, whereas 229 have a crime rate above the median. Consequently, our training data set comprises an almost equal number of neighborhoods categorized as at-risk and not-at-risk.
+
+```{r}
+summary(all_train)
+```
+## Correlation
+
+The variable **nox (0.72610622)**, **rm (-0.15255334)**, **age (0.63010625)**, **dis (-0.61867312)**, **rad (0.62810492)**, **tax (0.61111331)**, **lstat (0.46912702)** is correlated to the target variable, as seen in the correlation matrix. 
+
+```{r}
+cor_matrix <- cor(all_train)
+print(cor_matrix)
+```
+
+```{r}
+cor_with_target <- cor_matrix["target", -ncol(cor_matrix)]
+print(cor_with_target)
+```
+
+## Data structure
+
+There are 466 observations and 13 variables in the training dataset.
+
+```{r}
+str(all_train)
+```
+
+To enhance the readability of the data, we have made some adjustments. Specifically, we have converted the binary values of the "chas" variable to categorical values of "Y" and "N", indicating whether or not the neighborhood borders the Charles River. Similarly, we have converted the binary values of the "target" variable to categorical values of "Above" and "Below", based on whether the crime rate is above or below the median. As both "chas" and "target" are categorical variables, we have changed their class from integer to factor.
+
+```{r}
+all_train$chas <- as.factor(all_train$chas)
+all_train$target <- as.factor(all_train$target)
+```
+
+## Missing values
+
+The dataset is complete with no missing values.
+
+```{r}
+nrow(all_train[is.na(all_train),])
+```
+
+## Visulization of the data set
+
+Examine the shapes and distributions of the numerical variables by visualizing their density plots.
+
+```{r}
+datasub = melt(all_train)
+ggplot(datasub, aes(x = value)) + 
+    geom_density(fill = "skyblue") + 
+    facet_wrap(~variable, scales = 'free') 
+```
+
+For categorial variable chas, we can look at a confusion matrix table to make sure that we have enough observations for all levels:
+
+```{r}
+xtabs(~ target + chas, data=all_train)
+```
+```{r}
+# Create a confusion matrix
+conf_mat <- matrix(c(225, 12, 208, 21), nrow = 2, byrow = TRUE)
+```
+
+```{r}
+# Calculate precision, recall, and F1 score
+precision <- conf_mat[2, 2] / sum(conf_mat[, 2])
+recall <- conf_mat[2, 2] / sum(conf_mat[2, ])
+f1_score <- 2 * precision * recall / (precision + recall)
+```
+
+```{r}
+# Print the results
+cat(sprintf("Precision: %.2fn", precision))
+cat(sprintf("Recall: %.2fn", recall))
+cat(sprintf("F1 score: %.2fn", f1_score))
+```
+The F1 score, which ranges from 0 to 1 and indicates the model's precision and recall, suggests that the model is not performing well. A score of 1 would indicate perfect precision and recall, while a score of 0 would indicate poor performance. With a score of 0.16, the model's performance is considered poor.
+
+Next, examine the boxplots of the numerical variables with respect to the target variable.
+
+```{r}
+ggplot(datasub, aes(x = target, y = value, fill = target)) + 
+    geom_boxplot() + 
+    facet_wrap(~variable, scales = 'free') +
+    scale_fill_manual(values = c('skyblue', '#FFC0CB'))
+
+```
