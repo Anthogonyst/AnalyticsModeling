@@ -1,0 +1,302 @@
+---
+title: "Crime Logistical Model"
+author: "Anthony A, IvanTikhonov, Seung min song"
+date: "`r format(Sys.time(), '%m/%d/%Y')`"
+output: 
+  pdf_document:
+    pandoc_args: --listings
+---
+
+Overview
+In this homework assignment, you will explore, analyze and model a data set containing information on crime
+for various neighborhoods of a major city. Each record has a response variable indicating whether or not the crime
+rate is above the median crime rate (1) or not (0).
+
+Your objective is to build a binary logistic regression model on the training data set to predict whether the
+neighborhood will be at risk for high crime levels. You will provide classifications and probabilities for the
+evaluation data set using your binary logistic regression model.You can only use the variables given to you (or
+variables that you derive from the variables provided). Below is a short description of the variables of interest in
+the data set:
+ zn: proportion of residential land zoned for large lots (over 25000 square feet) (predictor variable)
+ indus: proportion of non-retail business acres per suburb (predictor variable)
+ chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) (predictor variable)
+ nox: nitrogen oxides concentration (parts per 10 million) (predictor variable)
+ rm: average number of rooms per dwelling (predictor variable)
+ age: proportion of owner-occupied units built prior to 1940 (predictor variable)
+ dis: weighted mean of distances to five Boston employment centers (predictor variable)
+ rad: index of accessibility to radial highways (predictor variable)
+ tax: full-value property-tax rate per $10,000 (predictor variable)
+ ptratio: pupil-teacher ratio by town (predictor variable)
+ black: 1000(Bk - 0.63)2 where Bk is the proportion of blacks by town (predictor variable)
+ lstat: lower status of the population (percent) (predictor variable)
+ medv: median value of owner-occupied homes in $1000s (predictor variable)
+ target: whether the crime rate is above the median crime rate (1) or not (0) (response variable)
+
+Deliverables:
+ A write-up submitted in PDF format. Your write-up should have four sections. Each one is described
+below. You may assume you are addressing me as a fellow data scientist, so do not need to shy away
+from technical details.
+ Assigned prediction (probabilities, classifications) for the evaluation data set. Use 0.5 threshold.
+ Include your R statistical programming code in an Appendix.
+
+1. DATA EXPLORATION
+Describe the size and the variables in the crime training data set. 
+Consider that too much detail will cause a manager to lose interest while too little detail will make the manager consider that you aren’t doing your job.
+
+Data acquisition
+
+```{r}
+all_train <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-training-data_modified.csv")
+eval <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-evaluation-data_modified.csv")
+```
+
+Data structure
+
+There are 466 observations and 13 variables in the training dataset.
+
+```{r}
+str(all_train)
+```
+
+Just to make the data easier on the eyes, we convert the 1s in chas to “Y”, if the neighborhood borders Charles River, and 0s to “N”, if not.
+
+We also convert the 1s in target to “Above”, if the crime rate is above the median, and 0s to “Below”, if it is below the median.
+
+
+Since variables chas and target are categorical, we are going to change their class from integer to factor:
+
+
+```{r}
+all_train$chas <- as.factor(all_train$chas)
+all_train$target <- as.factor(all_train$target)
+```
+
+Let’s look at the data structure again:
+
+
+```{r}
+library(dplyr)
+glimpse(all_train)
+```
+Summary Statistics
+Looking at the target variable, we see 237 observations are below the median crime rate and 229 are above the median crime rate, 
+thus we have roughly the same number of at risk and not-at-risk neighborhoods in our training data set.
+
+```{r}
+summary(all_train)
+```
+
+Missing values
+How many rows of data have NA values? 0 rows, thus there are no missing values in the dataset.
+
+```{r}
+nrow(all_train[is.na(all_train),])
+```
+Visulization of the data set
+Let’s first look at the density plots of the numerical variables to view their shapes and distributions:
+
+```{r}
+library(reshape)
+library(ggplot2)
+datasub = melt(all_train)
+ggplot(datasub, aes(x = value)) + 
+    geom_density(fill = "blue") + 
+    facet_wrap(~variable, scales = 'free') 
+```
+For categorial variable chas, we can look at a confusion matrix table to make sure that we have enough observations for all levels:
+
+```{r}
+xtabs(~ target + chas, data=all_train)
+```
+Then we will look at the boxplots of the numerical variables in relationship to target variable:
+
+```{r}
+ggplot(datasub, aes(x = target, y = value)) + 
+    geom_boxplot() + 
+    facet_wrap(~variable, scales = 'free') 
+```
+2. DATA PREPARATION
+Describe how you have transformed the data by changing the original variables or creating new variables. If you did transform the data or create new variables, discuss why you did this.
+
+Outlier Imputation
+From the boxplots above, we can see there are many outliers so we are going to fix them by replacing with medians.
+
+```{r}
+train_clean_pre <- all_train 
+set.seed(121)
+split <- caret::createDataPartition(train_clean_pre$target, p=0.85, list=FALSE)
+train_clean <- train_clean_pre[split, ]
+validation <- train_clean_pre[ -split, ]
+```
+
+Let’s look at the boxplots again after the outliers being imputed with median.
+
+```{r}
+ggplot(melt(train_clean), aes(x = target, y = value)) + 
+    geom_boxplot() + 
+    facet_wrap(~variable, scales = 'free') 
+```
+3. BUILD MODELS
+Using the training data, build at least three different binary logistic regression models, using different variables (or the same variables with different transformations). You may select the variables manually, use an approach such as Forward or Stepwise, use a different approach, or use a combination of techniques. Describe the techniques you used. If you manually selected a variable for inclusion into the model or exclusion into the model, indicate why this was done.
+
+Be sure to explain how you can make inferences from the model, as well as discuss other relevant model output. Discuss the coefficients in the models, do they make sense? Are you keeping the model even though it is counter intuitive? Why? The boss needs to know.
+
+We first create a full model by including all the variables:
+
+```{r}
+fullMod <- glm(target ~ ., data = train_clean, family = 'binomial')
+summary(fullMod)
+```
+
+Model 1 - P-values Selection
+From the full model, we select the variables that have small p-values:
+
+target ~ nox + age + rad + tax + ptratio + lstat
+
+```{r}
+logMod1 <- glm(target ~ nox + age + rad + tax + ptratio + lstat, 
+               data = train_clean, 
+               family = 'binomial')
+summary(logMod1)
+```
+Model 2 - Backward Selection
+
+```{r}
+library(MASS)
+library(dplyr)
+library(dbplyr)
+logMod2 <- fullMod %>% stepAIC(direction = "backward", trace = FALSE)
+summary(logMod2)
+```
+Model 3 - Forward Selection
+
+```{r}
+# Create an empty model with no variables
+emptyMod <- glm(target ~ 1, data = train_clean, family = 'binomial')
+logMod3 <- emptyMod %>% 
+  stepAIC(direction = "forward",
+          scope = ~ zn + indus + chas + nox + rm + age + dis 
+                    + rad + tax + ptratio + lstat + medv, 
+          trace = FALSE)
+summary(logMod3)
+```
+4. SELECT MODELS
+Decide on the criteria for selecting the best binary logistic regression model. Will you select models with slightly worse performance if it makes more sense or is more parsimonious? Discuss why you selected your models.
+
+For the binary logistic regression model, will you use a metric such as log likelihood, AIC, ROC curve, etc.? Using the training data set, evaluate the binary logistic regression model based on (a) accuracy, (b) classification error rate, (c) precision, (d) sensitivity, (e) specificity, (f) F1 score, (g) AUC, and (h) confusion matrix. Make predictions using the evaluation data set.
+
+```{r}
+formula(logMod1) # Model 1 formula
+```
+```{r}
+formula(logMod2) # Model 2 formula
+```
+```{r}
+formula(logMod3) # Model 3 formula
+```
+```{r}
+preds1 =predict(logMod1, newdata = validation)
+preds2 =predict(logMod2, newdata = validation)
+preds3 =predict(logMod3, newdata = validation)
+preds1[preds1 >= 0.5] <- 1
+preds1[preds1 < 0.5] <- 0
+preds1 = as.factor(preds1)
+preds2[preds2 >= 0.5] <- 1
+preds2[preds2 < 0.5] <- 0
+preds2 = as.factor(preds2)
+preds3[preds3 >= 0.5] <- 1
+preds3[preds3 < 0.5] <- 0
+preds3 = as.factor(preds3)
+```
+
+```{r}
+library(caret)
+library(lattice)
+library(purrr)
+```
+
+```{r}
+m1cM <- confusionMatrix(preds1, validation$target, mode = "everything")
+m2cM <- confusionMatrix(preds2, validation$target, mode = "everything")
+m3cM <- confusionMatrix(preds3, validation$target, mode = "everything")
+```
+
+```{r}
+fourfoldplot(m1cM$table, color = c("#B22222", "#2E8B57"), main="Model 1")
+```
+
+```{r}
+fourfoldplot(m2cM$table, color = c("#B22222", "#2E8B57"), main="Model 2")
+```
+
+```{r}
+fourfoldplot(m3cM$table, color = c("#B22222", "#2E8B57"), main="Model 3")
+```
+accuracy and lower error rate
+```{r}
+library(kableExtra)
+temp <- data.frame(m1cM$overall, 
+                   m2cM$overall, 
+                   m3cM$overall) %>%
+  t() %>%
+  data.frame() %>%
+  dplyr::select(Accuracy) %>%
+  mutate(Classification_Error_Rate = 1-Accuracy)
+Summ_Stat <-data.frame(m1cM$byClass, 
+                   m2cM$byClass, 
+                   m3cM$byClass) %>%
+  t() %>%
+  data.frame() %>%
+  cbind(temp) %>%
+  mutate(Model = c("Model 1", "Model 2", "Model 3")) %>%
+  dplyr::select(Model, Accuracy, Classification_Error_Rate, Precision, Sensitivity, Specificity, F1) %>%
+  mutate_if(is.numeric, round,3) %>%
+  kable('html', escape = F) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),full_width = F)
+Summ_Stat
+```
+Model 2,3 has better AUC
+```{r}
+getROC <- function(model) {
+    name <- deparse(substitute(model))
+    pred.prob1 <- predict(model, newdata = validation)
+    p1 <- data.frame(pred = validation$target, prob = pred.prob1)
+    p1 <- p1[order(p1$prob),]
+    rocobj <- pROC::roc(p1$pred, p1$prob)
+    plot(rocobj, asp=NA, legacy.axes = TRUE, print.auc=TRUE,
+         xlab="Specificity", main = name)
+}
+par(mfrow=c(2,2))
+getROC(logMod1)
+getROC(logMod2)
+getROC(logMod3)
+```
+Based on comparison result, we eventually choose Model 2/3 (same model)
+
+Make Prediction
+
+```{r}
+eval$chas <- as.factor(eval$chas)
+prediction = predict(logMod2, newdata = eval)
+prediction[prediction >= 0.5] <- 1
+prediction[prediction < 0.5] <- 0
+prediction = as.factor(prediction)
+prediction
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
