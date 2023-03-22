@@ -7,50 +7,47 @@ output:
     pandoc_args: --listings
 ---
 
-Overview
-In this homework assignment, you will explore, analyze and model a data set containing information on crime
-for various neighborhoods of a major city. Each record has a response variable indicating whether or not the crime
-rate is above the median crime rate (1) or not (0).
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
 
-Your objective is to build a binary logistic regression model on the training data set to predict whether the
-neighborhood will be at risk for high crime levels. You will provide classifications and probabilities for the
-evaluation data set using your binary logistic regression model.You can only use the variables given to you (or
-variables that you derive from the variables provided). Below is a short description of the variables of interest in
-the data set:
- zn: proportion of residential land zoned for large lots (over 25000 square feet) (predictor variable)
- indus: proportion of non-retail business acres per suburb (predictor variable)
- chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) (predictor variable)
- nox: nitrogen oxides concentration (parts per 10 million) (predictor variable)
- rm: average number of rooms per dwelling (predictor variable)
- age: proportion of owner-occupied units built prior to 1940 (predictor variable)
- dis: weighted mean of distances to five Boston employment centers (predictor variable)
- rad: index of accessibility to radial highways (predictor variable)
- tax: full-value property-tax rate per $10,000 (predictor variable)
- ptratio: pupil-teacher ratio by town (predictor variable)
- black: 1000(Bk - 0.63)2 where Bk is the proportion of blacks by town (predictor variable)
- lstat: lower status of the population (percent) (predictor variable)
- medv: median value of owner-occupied homes in $1000s (predictor variable)
- target: whether the crime rate is above the median crime rate (1) or not (0) (response variable)
+# Abstract
 
-Deliverables:
- A write-up submitted in PDF format. Your write-up should have four sections. Each one is described
-below. You may assume you are addressing me as a fellow data scientist, so do not need to shy away
-from technical details.
- Assigned prediction (probabilities, classifications) for the evaluation data set. Use 0.5 threshold.
- Include your R statistical programming code in an Appendix.
+We will evaluate data related to neighborhood crime and determine if a neighborhood is above the median crime rate.
+To do this, we will create a logistical model that rates either true or false.
+This information is necessary to determine if a neighborhood is going through difficult times or is over-policed by authorities.
+As such, our approach attempts to find a non-biased answer based on what is known.
 
-1. DATA EXPLORATION
-Describe the size and the variables in the crime training data set. 
-Consider that too much detail will cause a manager to lose interest while too little detail will make the manager consider that you aren’t doing your job.
+# Datasets
 
-Data acquisition
+Datasets are provided by CUNY School of Professional Studies for academic purposes.
+It is reflective of public data gathered online.
+
+# Data Exploration
+
+The data has 12 features and 1 target variable.
+Since our model will be logistical regression, a positive result is 1 and vice versa.
+
+- zn: proportion of residential land zoned for large lots (over 25000 square feet) 
+- indus: proportion of non-retail business acres per suburb 
+- chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) 
+- nox: nitrogen oxides concentration (parts per 10 million) 
+- rm: average number of rooms per dwelling 
+- age: proportion of owner-occupied units built prior to 1940 
+- dis: weighted mean of distances to five Boston employment centers 
+- rad: index of accessibility to radial highways 
+- tax: full-value property-tax rate per $10,000 
+- ptratio: pupil-teacher ratio by town 
+- lstat: lower status of the population (percent) 
+- medv: median value of owner-occupied homes in $1000s 
+- target: whether the crime rate is above the median crime rate (1) or not (0)
 
 ```{r}
 all_train <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-training-data_modified.csv")
 eval <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-evaluation-data_modified.csv")
 ```
 
-Data structure
+## Data structure
 
 There are 466 observations and 13 variables in the training dataset.
 
