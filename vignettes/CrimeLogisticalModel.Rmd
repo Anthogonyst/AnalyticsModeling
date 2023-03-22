@@ -183,15 +183,6 @@ summary(logMod3)
 # Model Selection
 
 ```{r}
-formula(logMod1) # Model 1 formula
-```
-```{r}
-formula(logMod2) # Model 2 formula
-```
-```{r}
-formula(logMod3) # Model 3 formula
-```
-```{r}
 preds1 =predict(logMod1, newdata = validation)
 preds2 =predict(logMod2, newdata = validation)
 preds3 =predict(logMod3, newdata = validation)
@@ -214,11 +205,23 @@ m3cM <- confusionMatrix(preds3, validation$target, mode = "everything")
 ```
 
 ```{r}
+formula(logMod1) # Model 1 formula
+```
+
+```{r}
 fourfoldplot(m1cM$table, color = c("#B22222", "#2E8B57"), main="Model 1")
 ```
 
 ```{r}
+formula(logMod2) # Model 2 formula
+```
+
+```{r}
 fourfoldplot(m2cM$table, color = c("#B22222", "#2E8B57"), main="Model 2")
+```
+
+```{r}
+formula(logMod3) # Model 3 formula
 ```
 
 ```{r}
