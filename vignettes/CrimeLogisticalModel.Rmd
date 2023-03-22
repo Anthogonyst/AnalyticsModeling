@@ -36,69 +36,75 @@ As such, our approach attempts to find a non-biased answer based on what is know
 Datasets are provided by CUNY School of Professional Studies for academic purposes.
 It is reflective of public data gathered online.
 
-# Data Exploration
+# 1. DATA EXPLORATION
 
-The data has 12 features and 1 target variable.
-Since our model will be logistical regression, a positive result is 1 and vice versa.
+Describe the size and the variables in the crime training data set. 
+Consider that too much detail will cause a manager to lose interest while too little detail will make the manager consider that you aren’t doing your job.
 
-- zn: proportion of residential land zoned for large lots (over 25000 square feet) 
-- indus: proportion of non-retail business acres per suburb 
-- chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) 
-- nox: nitrogen oxides concentration (parts per 10 million) 
-- rm: average number of rooms per dwelling 
-- age: proportion of owner-occupied units built prior to 1940 
-- dis: weighted mean of distances to five Boston employment centers 
-- rad: index of accessibility to radial highways 
-- tax: full-value property-tax rate per $10,000 
-- ptratio: pupil-teacher ratio by town 
-- lstat: lower status of the population (percent) 
-- medv: median value of owner-occupied homes in $1000s 
-- target: whether the crime rate is above the median crime rate (1) or not (0)
+## Data acquisition
 
 ```{r}
 all_train <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-training-data_modified.csv")
 eval <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-evaluation-data_modified.csv")
 ```
 
+Revisit the data structure to gain a better understanding.
+```{r}
+glimpse(all_train)
+```
+
+## Summary Statistics
+
+Upon analyzing the target variable, we observe that 237 out of the total observations have a crime rate below the median, whereas 229 have a crime rate above the median. Consequently, our training data set comprises an almost equal number of neighborhoods categorized as at-risk and not-at-risk.
+
+```{r}
+summary(all_train)
+```
+## Correlation
+
+The variable **nox (0.72610622)**, **rm (-0.15255334)**, **age (0.63010625)**, **dis (-0.61867312)**, **rad (0.62810492)**, **tax (0.61111331)**, **lstat (0.46912702)** is correlated to the target variable, as seen in the correlation matrix. 
+
+```{r}
+cor_matrix <- cor(all_train)
+print(cor_matrix)
+```
+
+```{r}
+cor_with_target <- cor_matrix["target", -ncol(cor_matrix)]
+print(cor_with_target)
+```
+
 ## Data structure
 
 There are 466 observations and 13 variables in the training dataset.
-Additionally, there are no missing values so imputation is not necessary on this dataset.
-Shown below is a sample of its head.
 
 ```{r}
 str(all_train)
 ```
 
-```{r, include=FALSE}
-nrow(all_train[is.na(all_train),])
-```
+To enhance the readability of the data, we have made some adjustments. Specifically, we have converted the binary values of the "chas" variable to categorical values of "Y" and "N", indicating whether or not the neighborhood borders the Charles River. Similarly, we have converted the binary values of the "target" variable to categorical values of "Above" and "Below", based on whether the crime rate is above or below the median. As both "chas" and "target" are categorical variables, we have changed their class from integer to factor.
 
 ```{r}
-#Since variables chas and target are categorical, we are going to change their class from integer to factor:
-
 all_train$chas <- as.factor(all_train$chas)
 all_train$target <- as.factor(all_train$target)
 ```
 
-## Summary Statistics
+## Missing values
 
-Looking at the target variable, we see 237 observations are below the median crime rate and 229 are above the median crime rate. 
-Thus we have roughly the same number of at risk and not-at-risk neighborhoods in our training data set.
-This is good because it means that our classes are evenly balanced for our model.
+The dataset is complete with no missing values.
 
 ```{r}
-summary(all_train)
+nrow(all_train[is.na(all_train),])
 ```
 
 ## Visulization of the data set
 
-Let’s first look at the density plots of the numerical variables to view their shapes and distributions:
+Examine the shapes and distributions of the numerical variables by visualizing their density plots.
 
 ```{r}
-datasub = reshape2::melt(all_train, id=c("chas", "target"))
+datasub = melt(all_train)
 ggplot(datasub, aes(x = value)) + 
-    geom_density(fill = "blue") + 
+    geom_density(fill = "skyblue") + 
     facet_wrap(~variable, scales = 'free') 
 ```
 
@@ -107,14 +113,35 @@ For categorial variable chas, we can look at a confusion matrix table to make su
 ```{r}
 xtabs(~ target + chas, data=all_train)
 ```
-
-Then we will look at the boxplots of the numerical variables in relationship to target variable:
+```{r}
+# Create a confusion matrix
+conf_mat <- matrix(c(225, 12, 208, 21), nrow = 2, byrow = TRUE)
+```
 
 ```{r}
-ggplot(datasub, aes(x = target, y = value)) + 
-    geom_boxplot() + 
-    facet_wrap(~variable, scales = 'free') 
+# Calculate precision, recall, and F1 score
+precision <- conf_mat[2, 2] / sum(conf_mat[, 2])
+recall <- conf_mat[2, 2] / sum(conf_mat[2, ])
+f1_score <- 2 * precision * recall / (precision + recall)
 ```
+
+```{r}
+# Print the results
+cat(sprintf("Precision: %.2fn", precision))
+cat(sprintf("Recall: %.2fn", recall))
+cat(sprintf("F1 score: %.2fn", f1_score))
+```
+The F1 score, which ranges from 0 to 1 and indicates the model's precision and recall, suggests that the model is not performing well. A score of 1 would indicate perfect precision and recall, while a score of 0 would indicate poor performance. With a score of 0.16, the model's performance is considered poor.
+
+Next, examine the boxplots of the numerical variables with respect to the target variable.
+
+```{r}
+ggplot(datasub, aes(x = target, y = value, fill = target)) + 
+    geom_boxplot() + 
+    facet_wrap(~variable, scales = 'free') +
+    scale_fill_manual(values = c('skyblue', '#FFC0CB'))
+```
+
 
 # Data Preparation
 
