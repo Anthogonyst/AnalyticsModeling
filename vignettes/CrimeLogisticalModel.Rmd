@@ -11,6 +11,19 @@ output:
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
+```{r libraries, include=FALSE, warning=FALSE}
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(MASS)
+library(dplyr)
+library(dbplyr)
+library(caret)
+library(lattice)
+library(purrr)
+library(kableExtra)
+```
+
 # Abstract
 
 We will evaluate data related to neighborhood crime and determine if a neighborhood is above the median crime rate.
@@ -71,7 +84,6 @@ all_train$target <- as.factor(all_train$target)
 Let’s look at the data structure again:
 
 ```{r}
-library(dplyr)
 glimpse(all_train)
 ```
 
@@ -157,9 +169,6 @@ summary(logMod1)
 Model 2 - Backward Selection
 
 ```{r}
-library(MASS)
-library(dplyr)
-library(dbplyr)
 logMod2 <- fullMod %>% stepAIC(direction = "backward", trace = FALSE)
 summary(logMod2)
 ```
@@ -204,11 +213,6 @@ preds3[preds3 < 0.5] <- 0
 preds3 = as.factor(preds3)
 ```
 
-```{r}
-library(caret)
-library(lattice)
-library(purrr)
-```
 
 ```{r}
 m1cM <- confusionMatrix(preds1, validation$target, mode = "everything")
@@ -229,7 +233,6 @@ fourfoldplot(m3cM$table, color = c("#B22222", "#2E8B57"), main="Model 3")
 ```
 accuracy and lower error rate
 ```{r}
-library(kableExtra)
 temp <- data.frame(m1cM$overall, 
                    m2cM$overall, 
                    m3cM$overall) %>%
