@@ -250,9 +250,9 @@ Summ_Stat <-data.frame(m1cM$byClass,
   cbind(temp) %>%
   mutate(Model = c("Model 1", "Model 2", "Model 3")) %>%
   dplyr::select(Model, Accuracy, Classification_Error_Rate, Precision, Sensitivity, Specificity, F1) %>%
-  mutate_if(is.numeric, round,3) %>%
-  kable('html', escape = F) %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),full_width = F)
+  mutate_if(is.numeric, round,3)# %>%
+  #kable('html', escape = F) %>%
+  #kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),full_width = F)
 Summ_Stat
 ```
 Model 2,3 has better AUC
