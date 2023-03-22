@@ -96,7 +96,7 @@ summary(all_train)
 Let’s first look at the density plots of the numerical variables to view their shapes and distributions:
 
 ```{r}
-datasub = reshape2::melt(all_train, id="target")
+datasub = reshape2::melt(all_train, id=c("chas", "target"))
 ggplot(datasub, aes(x = value)) + 
     geom_density(fill = "blue") + 
     facet_wrap(~variable, scales = 'free') 
@@ -133,7 +133,7 @@ validation <- train_clean_pre[ -split, ]
 Let’s look at the boxplots again after the outliers being imputed with median.
 
 ```{r}
-ggplot(melt(train_clean), aes(x = target, y = value)) + 
+ggplot(reshape2::melt(train_clean, id=c("chas", "target")), aes(x = target, y = value)) + 
     geom_boxplot() + 
     facet_wrap(~variable, scales = 'free') 
 ```
