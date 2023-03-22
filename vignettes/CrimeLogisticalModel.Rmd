@@ -36,10 +36,24 @@ As such, our approach attempts to find a non-biased answer based on what is know
 Datasets are provided by CUNY School of Professional Studies for academic purposes.
 It is reflective of public data gathered online.
 
-# 1. DATA EXPLORATION
+# Data Exploration
 
-Describe the size and the variables in the crime training data set. 
-Consider that too much detail will cause a manager to lose interest while too little detail will make the manager consider that you aren’t doing your job.
+The data has 12 features and 1 target variable.
+Since our model will be logistical regression, a positive result is 1 and vice versa.
+
+- zn: proportion of residential land zoned for large lots (over 25000 square feet) 
+- indus: proportion of non-retail business acres per suburb 
+- chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) 
+- nox: nitrogen oxides concentration (parts per 10 million) 
+- rm: average number of rooms per dwelling 
+- age: proportion of owner-occupied units built prior to 1940 
+- dis: weighted mean of distances to five Boston employment centers 
+- rad: index of accessibility to radial highways 
+- tax: full-value property-tax rate per $10,000 
+- ptratio: pupil-teacher ratio by town 
+- lstat: lower status of the population (percent) 
+- medv: median value of owner-occupied homes in $1000s 
+- target: whether the crime rate is above the median crime rate (1) or not (0)
 
 ## Data acquisition
 
