@@ -132,25 +132,23 @@ ggplot(datasub, aes(x = value)) +
 For categorial variable chas, we can look at a confusion matrix table to make sure that we have enough observations for all levels:
 
 ```{r}
-xtabs(~ target + chas, data=all_train)
-```
-```{r}
-# Create a confusion matrix
-conf_mat <- matrix(c(225, 12, 208, 21), nrow = 2, byrow = TRUE)
+(
+confusionMatrix = xtabs(~ target + chas, data=all_train)
+)
 ```
 
 ```{r}
 # Calculate precision, recall, and F1 score
-precision <- conf_mat[2, 2] / sum(conf_mat[, 2])
-recall <- conf_mat[2, 2] / sum(conf_mat[2, ])
+precision <- confusionMatrix[2, 2] / sum(confusionMatrix[, 2])
+recall <- confusionMatrix[2, 2] / sum(confusionMatrix[2, ])
 f1_score <- 2 * precision * recall / (precision + recall)
 ```
 
 ```{r}
 # Print the results
-cat(sprintf("Precision: %.2fn", precision))
-cat(sprintf("Recall: %.2fn", recall))
-cat(sprintf("F1 score: %.2fn", f1_score))
+sprintf("Precision: %.4f", precision)
+sprintf("Recall: %.4f", recall)
+sprintf("F1 score: %.4f", f1_score)
 ```
 The F1 score, which ranges from 0 to 1 and indicates the model's precision and recall, suggests that the model is not performing well. A score of 1 would indicate perfect precision and recall, while a score of 0 would indicate poor performance. With a score of 0.16, the model's performance is considered poor.
 
