@@ -90,9 +90,7 @@ summary(all_train)
 Let’s first look at the density plots of the numerical variables to view their shapes and distributions:
 
 ```{r}
-library(reshape)
-library(ggplot2)
-datasub = melt(all_train)
+datasub = reshape2::melt(all_train, id="target")
 ggplot(datasub, aes(x = value)) + 
     geom_density(fill = "blue") + 
     facet_wrap(~variable, scales = 'free') 
