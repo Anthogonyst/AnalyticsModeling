@@ -59,7 +59,7 @@ Since our model will be logistical regression, a positive result is 1 and vice v
 
 ```{r}
 all_train <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-training-data_modified.csv")
-eval <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-evaluation-data_modified.csv")
+all_test <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-evaluation-data_modified.csv")
 ```
 
 Revisit the data structure to gain a better understanding.
@@ -321,8 +321,8 @@ Based on comparison result, we eventually choose Model 2/3 (same model)
 Make Prediction
 
 ```{r}
-eval$chas <- as.factor(eval$chas)
-prediction = predict(logMod2, newdata = eval)
+all_test$chas <- as.factor(all_test$chas)
+prediction = predict(logMod2, newdata = all_test)
 prediction[prediction >= 0.5] <- 1
 prediction[prediction < 0.5] <- 0
 prediction = as.factor(prediction)
