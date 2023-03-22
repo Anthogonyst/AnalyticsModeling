@@ -73,18 +73,22 @@ Upon analyzing the target variable, we observe that 237 out of the total observa
 ```{r}
 summary(all_train)
 ```
+
 ## Correlation
 
-The variable **nox (0.72610622)**, **rm (-0.15255334)**, **age (0.63010625)**, **dis (-0.61867312)**, **rad (0.62810492)**, **tax (0.61111331)**, **lstat (0.46912702)** is correlated to the target variable, as seen in the correlation matrix. 
-
-```{r}
+```{r, include=FALSE}
+(
 cor_matrix <- cor(all_train)
-print(cor_matrix)
+)
 ```
 
+According to our correlation matrix, the nox, age, rad, tax, and indus variables show moderate positive correlation (>0.6).
+Additionally, the dis variable shows moderate negative correlation (< -0.6)
+
 ```{r}
-cor_with_target <- cor_matrix["target", -ncol(cor_matrix)]
-print(cor_with_target)
+(
+cor_with_target <- cor_matrix["target", colnames(cor_matrix) != "target"]
+)
 ```
 
 ## Data structure
