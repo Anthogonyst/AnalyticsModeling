@@ -76,12 +76,10 @@ print(cor_with_target)
 ## Data structure
 
 There are 466 observations and 13 variables in the training dataset.
-<<<<<<< HEAD
+
 Additionally, there are no missing values so imputation is not necessary on this dataset.
 Our minimum sample size at n% probability would be 10*13/n so our sample size is adequate (466 > 260) where 50% of samples are expected to be over the median by definition.
 Shown below is a sample of its head.
-=======
->>>>>>> 44453b7f0a3972e97a59001c0860b7e83b5535d5
 
 ```{r}
 str(all_train)
@@ -107,7 +105,7 @@ nrow(all_train[is.na(all_train),])
 Examine the shapes and distributions of the numerical variables by visualizing their density plots.
 
 ```{r}
-datasub = melt(all_train)
+datasub = reshape2::melt(all_train, id=c("chas", "target"))
 ggplot(datasub, aes(x = value)) + 
     geom_density(fill = "skyblue") + 
     facet_wrap(~variable, scales = 'free') 
