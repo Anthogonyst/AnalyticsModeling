@@ -55,21 +55,15 @@ There are 466 observations and 13 variables in the training dataset.
 str(all_train)
 ```
 
-Just to make the data easier on the eyes, we convert the 1s in chas to “Y”, if the neighborhood borders Charles River, and 0s to “N”, if not.
-
-We also convert the 1s in target to “Above”, if the crime rate is above the median, and 0s to “Below”, if it is below the median.
-
-
-Since variables chas and target are categorical, we are going to change their class from integer to factor:
-
 
 ```{r}
+#Since variables chas and target are categorical, we are going to change their class from integer to factor:
+
 all_train$chas <- as.factor(all_train$chas)
 all_train$target <- as.factor(all_train$target)
 ```
 
 Let’s look at the data structure again:
-
 
 ```{r}
 library(dplyr)
