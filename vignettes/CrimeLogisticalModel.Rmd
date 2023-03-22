@@ -64,6 +64,7 @@ eval <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/ma
 
 There are 466 observations and 13 variables in the training dataset.
 Additionally, there are no missing values so imputation is not necessary on this dataset.
+Our minimum sample size at n% probability would be 10*13/n so our sample size is adequate (466 > 260) where 50% of samples are expected to be over the median by definition.
 Shown below is a sample of its head.
 
 ```{r}
