@@ -11,7 +11,7 @@ output:
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
-```{r libraries, include=FALSE, warning=FALSE}
+```{r libraries, include=FALSE, warning=FALSE, class.output="scroll-less"}
 library(dplyr)
 library(reshape2)
 library(ggplot2)
@@ -22,6 +22,7 @@ library(caret)
 library(lattice)
 library(purrr)
 library(kableExtra)
+invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source))
 ```
 
 # Abstract
