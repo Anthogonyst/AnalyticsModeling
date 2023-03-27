@@ -1,6 +1,6 @@
 ---
 title: "Crime Logistical Model"
-author: "Anthony A, IvanTikhonov, Seung min song, Alice Friedman"
+author: "Anthony A, IvanTikhonov, Seung min song, Alice A. Friedman"
 date: "`r format(Sys.time(), '%m/%d/%Y')`"
 output: 
   pdf_document:
