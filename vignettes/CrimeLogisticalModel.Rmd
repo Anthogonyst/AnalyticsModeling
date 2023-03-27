@@ -124,9 +124,10 @@ Examine the shapes and distributions of the numerical variables by visualizing t
 
 ```{r}
 datasub = reshape2::melt(all_train_raw, id=c("chas", "target"))
-ggplot(datasub, aes(x = value)) + 
-    geom_density(fill = "skyblue") + 
-    facet_wrap(~variable, scales = 'free') 
+ggplot2::ggplot(datasub) +
+  ggplot2::aes(x = value) + 
+  ggplot2::geom_density(fill = "skyblue") + 
+  ggplot2::facet_wrap(~variable, scales = 'free') 
 ```
 
 Next, examine the boxplots of the numerical variables with respect to the target variable.
