@@ -304,25 +304,25 @@ Our third model is the AIC backwards selection model.
 formula(modelThree)
 cv3 = VerifyKfold(modelThree, validation, "target")
 cv3
-graphics::fourfoldplot(cv3$table, color = c("#B22222", "#2E8B57"), main="Model 2")
+graphics::fourfoldplot(cv3$table, color = c("#B22222", "#2E8B57"), main="Model 3")
 ```
 
 Our fourth model is the AIC forwards selection model from model two, nicknamed 2-F in comparison to the next model.
 
 ```{r}
 formula(modelFour)
-cv4 = VerifyKfold(modelThree, validation, "target")
+cv4 = VerifyKfold(modelFour, validation, "target")
 cv4
-graphics::fourfoldplot(cv4$table, color = c("#B22222", "#2E8B57"), main="Model 2", space = 0.4)
+graphics::fourfoldplot(cv4$table, color = c("#B22222", "#2E8B57"), main = "Model 4")
 ```
 
 Our fifth model is the AIC forwards selection model from model one, nicknamed 1-F in comparison to the previous model.
 
 ```{r}
-formula(modelThree)
-cv5 = VerifyKfold(modelThree, validation, "target")
+formula(modelFive)
+cv5 = VerifyKfold(modelFive, validation, "target")
 cv5
-graphics::fourfoldplot(cv5$table, color = c("#B22222", "#2E8B57"), main="Model 2")
+graphics::fourfoldplot(cv5$table, color = c("#B22222", "#2E8B57"), main = "Model 5")
 ```
 
 
@@ -373,9 +373,10 @@ getROC <- function(model) {
          xlab="Specificity", main = name)
 }
 par(mfrow=c(2,2))
+getROC(modelOne)
 getROC(modelTwo)
 getROC(modelThree)
-getROC(modelFour)
+getROC(modelFive)
 ```
 
 Based on comparison result, we eventually choose Model 2/3 (same model)
