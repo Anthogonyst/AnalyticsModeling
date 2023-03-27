@@ -81,19 +81,22 @@ summary(all_train_raw)
 
 ## Correlation
 
-```{r, include=FALSE}
-(
-cor_matrix <- cor(all_train_raw)
-)
-```
-
-According to our correlation matrix, the nox, age, rad, tax, and indus variables show moderate positive correlation (>0.6).
-Additionally, the dis variable shows moderate negative correlation (< -0.6)
+Our first curiosity is if there is any strong correlation to the target variable.
+Accordingly, the nox, age, rad, tax, and indus variables show moderate positive correlation (>0.6).
+Additionally, the dis variable shows moderate negative correlation (< -0.6).
+Overall, nothing is too strongly correlated to be able to justify not building a model.
 
 ```{r}
-(
-cor_with_target <- cor_matrix["target", colnames(cor_matrix) != "target"]
-)
+cor_matrix <- cor(all_train_raw)
+cor_matrix["target", colnames(cor_matrix) != "target"]
+```
+
+However, for the big picture sense, we also need to verify that there is no multicollinearity.
+According to our visualization, the variables rad and tax may be just too closely correlated together.
+We may have to instead use PCA to create an orthogonal complement of those two variables instead.
+
+```{r}
+PlotCorrEllipse(cor_matrix)
 ```
 
 ## Data structure
@@ -411,4 +414,8 @@ VerifyKfold
 
 ```{r, class.output="foldable"}
 getROC
+```
+
+```{r, class.output="foldable"}
+PlotCorrEllipse
 ```
