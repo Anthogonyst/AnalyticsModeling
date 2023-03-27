@@ -1,7 +1,9 @@
 
+#
 
 ##### Linear Regression Assumptions #####
 
+#' @author Anthogonyst
 PlotLinearity <- function(lm_calc, col = "#FF464A", extend = NULL) {
   ggplot2::ggplot(data = lm_calc) +
   ggplot2::aes(x = lm_calc$fitted.values, y = lm_calc$residuals) +
@@ -13,6 +15,7 @@ PlotLinearity <- function(lm_calc, col = "#FF464A", extend = NULL) {
   extend
 }
 
+#' @author Anthogonyst
 PlotDistribution <- function(lm_calc, col = "#FF464A", extend = NULL) {
   ggplot2::ggplot(data = lm_calc) +
   ggplot2::aes(x = lm_calc$residuals, y = "") + 
@@ -22,6 +25,7 @@ PlotDistribution <- function(lm_calc, col = "#FF464A", extend = NULL) {
   extend
 }
 
+#' @author Anthogonyst
 PlotQQuantile <- function(lm_calc, col = "#FF464A", extend = NULL) {
   ggplot2::ggplot(data = lm_calc) +
   ggplot2::aes(sample = lm_calc$residuals) +
@@ -32,6 +36,7 @@ PlotQQuantile <- function(lm_calc, col = "#FF464A", extend = NULL) {
 
 ##### Correlation #####
 
+#' @author Anthogonyst
 PlotCorrEllipse <- function(corData, pal = RColorBrewer::brewer.pal(5, "Spectral"),
                             highlight = c("both", "positive", "negative")[1], hiMod = 1) {
   colorRange = 100
@@ -60,6 +65,7 @@ PlotCorrEllipse <- function(corData, pal = RColorBrewer::brewer.pal(5, "Spectral
 
 ##### Classification #####
 
+#' @author Anthogonyst
 ClassificationInfo <- function(df, applyTable = FALSE, verbose = FALSE) {
   if (applyTable) {
     df = table(df)
