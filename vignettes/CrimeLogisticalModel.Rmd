@@ -149,7 +149,7 @@ ggplot2::ggplot(datasub) +
 
 # Data Preparation
 
-To enhance the readability of the data, we have made some adjustments. Specifically, we have converted the binary values of the "chas" variable to categorical values of "Y" and "N", indicating whether or not the neighborhood borders the Charles River. Similarly, we have converted the binary values of the "target" variable to categorical values of "Above" and "Below", based on whether the crime rate is above or below the median. As both "chas" and "target" are categorical variables, we have changed their class from integer to factor.
+As both "chas" and "target" are categorical variables, we have changed their class from integer to factor.
 
 ```{r}
 all_train = all_train_raw
