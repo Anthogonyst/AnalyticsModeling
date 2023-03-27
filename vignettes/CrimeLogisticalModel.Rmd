@@ -114,13 +114,16 @@ str(all_train_raw)
 
 The dataset is complete with no missing values.
 
-```{r}
+```{r, include=FALSE, echo=FALSE}
 nrow(all_train_raw[is.na(all_train_raw),])
 ```
 
 ## Visulization of the data set
 
-Examine the shapes and distributions of the numerical variables by visualizing their density plots.
+First, let's examine what the data looks like without separating the target variables.
+At first, we notice that indus and rad appears binomial.
+Additionally, age and nox seem to be skewed in one direction.
+Thankfully, we do not have to normalize the data until necessary because it is not an assumption for logistical regression.
 
 ```{r}
 datasub = reshape2::melt(all_train_raw, id=c("target"))
@@ -130,15 +133,19 @@ ggplot2::ggplot(datasub) +
   ggplot2::facet_wrap(~variable, scales = 'free') 
 ```
 
-Next, examine the boxplots of the numerical variables with respect to the target variable.
+Next, let's examine the distribution of the features with respect to the target variable.
+Noticably, some features strongly belong to one group such as indus whereas others are more ambiguous.
+Therefore, we should expect all of the models to weigh indus heavily.
+Additionally, we can expect other boundaries to get weighed with some significance such as nox and lstat.
 
 ```{r}
-ggplot(datasub, aes(x = target, y = value, fill = target)) + 
-    geom_boxplot() + 
-    facet_wrap(~variable, scales = 'free') +
-    scale_fill_manual(values = c('skyblue', '#FFC0CB'))
+ggplot(datasub) +
+  aes(x = "", y = value, group = target, fill = target) +
+  geom_violin(adjust = 1L, scale = "area") +
+  coord_flip() +
+  theme_minimal() +
+  facet_wrap(vars(variable), scales = "free")
 ```
-
 
 # Data Preparation
 
