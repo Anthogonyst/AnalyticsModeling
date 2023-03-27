@@ -51,30 +51,37 @@ Since our model will be logistical regression, a positive result is 1 and vice v
 - medv: median value of owner-occupied homes in $1000s 
 - target: whether the crime rate is above the median crime rate (1) or not (0)
 
-## Data acquisition
+## Assumptions for Logistical Regression
 
-```{r}
-all_train <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-training-data_modified.csv")
+When we do logistical regression, we have to consider our assumptions and then verify our data holds up to them.
+We must ensure that there is low or no multicollinearity between features.
+Additionally, the features need to be linearly related.
+Our minimum sample size at n% probability would be 10*13/n so our sample size is adequate (466 > 260) where 50% of samples are expected to be over the median by definition.
+Finally, by phrasing the question appropriately, we can make a boolean outcome variable.
+Going forward, for our research question we ask "is the crime present in this neighborhood above the median rate?"
+
+```{r, include=FALSE, echo=FALSE}
+all_train_raw <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-training-data_modified.csv")
 all_test <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-evaluation-data_modified.csv")
 ```
 
-Revisit the data structure to gain a better understanding.
-```{r}
-glimpse(all_train)
+```{r, include=FALSE, echo=FALSE}
+glimpse(all_train_raw)
 ```
 
 ## Summary Statistics
 
 Upon analyzing the target variable, we observe that 237 out of the total observations have a crime rate below the median, whereas 229 have a crime rate above the median. Consequently, our training data set comprises an almost equal number of neighborhoods categorized as at-risk and not-at-risk.
+
 ```{r}
-summary(all_train)
+summary(all_train_raw)
 ```
 
 ## Correlation
 
 ```{r, include=FALSE}
 (
-cor_matrix <- cor(all_train)
+cor_matrix <- cor(all_train_raw)
 )
 ```
 
@@ -92,18 +99,10 @@ cor_with_target <- cor_matrix["target", colnames(cor_matrix) != "target"]
 There are 466 observations and 13 variables in the training dataset.
 
 Additionally, there are no missing values so imputation is not necessary on this dataset.
-Our minimum sample size at n% probability would be 10*13/n so our sample size is adequate (466 > 260) where 50% of samples are expected to be over the median by definition.
 Shown below is a sample of its head.
 
 ```{r}
-str(all_train)
-```
-
-To enhance the readability of the data, we have made some adjustments. Specifically, we have converted the binary values of the "chas" variable to categorical values of "Y" and "N", indicating whether or not the neighborhood borders the Charles River. Similarly, we have converted the binary values of the "target" variable to categorical values of "Above" and "Below", based on whether the crime rate is above or below the median. As both "chas" and "target" are categorical variables, we have changed their class from integer to factor.
-
-```{r}
-all_train$chas <- as.factor(all_train$chas)
-all_train$target <- as.factor(all_train$target)
+str(all_train_raw)
 ```
 
 ## Missing values
@@ -111,7 +110,7 @@ all_train$target <- as.factor(all_train$target)
 The dataset is complete with no missing values.
 
 ```{r}
-nrow(all_train[is.na(all_train),])
+nrow(all_train_raw[is.na(all_train_raw),])
 ```
 
 ## Visulization of the data set
@@ -119,7 +118,7 @@ nrow(all_train[is.na(all_train),])
 Examine the shapes and distributions of the numerical variables by visualizing their density plots.
 
 ```{r}
-datasub = reshape2::melt(all_train, id=c("chas", "target"))
+datasub = reshape2::melt(all_train_raw, id=c("chas", "target"))
 ggplot(datasub, aes(x = value)) + 
     geom_density(fill = "skyblue") + 
     facet_wrap(~variable, scales = 'free') 
@@ -136,6 +135,15 @@ ggplot(datasub, aes(x = target, y = value, fill = target)) +
 
 
 # Data Preparation
+
+To enhance the readability of the data, we have made some adjustments. Specifically, we have converted the binary values of the "chas" variable to categorical values of "Y" and "N", indicating whether or not the neighborhood borders the Charles River. Similarly, we have converted the binary values of the "target" variable to categorical values of "Above" and "Below", based on whether the crime rate is above or below the median. As both "chas" and "target" are categorical variables, we have changed their class from integer to factor.
+
+```{r}
+all_train = all_train_raw
+all_train$chas <- as.factor(all_train$chas)
+all_train$target <- as.factor(all_train$target)
+```
+
 
 ## Outlier Imputation
 
