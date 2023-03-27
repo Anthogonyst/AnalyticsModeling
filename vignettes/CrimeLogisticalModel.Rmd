@@ -11,7 +11,7 @@ output:
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
-```{r libraries, include=FALSE, warning=FALSE}
+```{r libraries, include=FALSE, warning=FALSE, class.output="scroll-less"}
 library(dplyr)
 library(reshape2)
 library(ggplot2)
@@ -22,6 +22,7 @@ library(caret)
 library(lattice)
 library(purrr)
 library(kableExtra)
+invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source))
 ```
 
 # Abstract
@@ -50,40 +51,52 @@ Since our model will be logistical regression, a positive result is 1 and vice v
 - medv: median value of owner-occupied homes in $1000s 
 - target: whether the crime rate is above the median crime rate (1) or not (0)
 
-## Data acquisition
+## Assumptions for Logistical Regression
 
-```{r}
-all_train <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-training-data_modified.csv")
-all_test <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-evaluation-data_modified.csv")
+When we do logistical regression, we have to consider our assumptions and then verify our data holds up to them.
+We must ensure that there is low or no multicollinearity between features.
+Additionally, the features need to be linearly related.
+Our minimum sample size at n% probability would be 10*13/n so our sample size is adequate (466 > 260) where 50% of samples are expected to be over the median by definition.
+Finally, by phrasing the question appropriately, we can make a boolean outcome variable.
+Going forward, for our research question we ask "is the crime present in this neighborhood above the median rate?"
+
+```{r, include=FALSE, echo=FALSE}
+dataUrl = "https://github.com/Anthogonyst/AnalyticsModeling/tree/master/data"
+
+all_train_raw = LoadDataElseWeb("crime-training-data_modified.csv", dataUrl)
+all_test = LoadDataElseWeb("crime-evaluation-data_modified.csv", dataUrl)
 ```
 
-Revisit the data structure to gain a better understanding.
-```{r}
-glimpse(all_train)
+```{r, include=FALSE, echo=FALSE}
+glimpse(all_train_raw)
 ```
 
 ## Summary Statistics
 
 Upon analyzing the target variable, we observe that 237 out of the total observations have a crime rate below the median, whereas 229 have a crime rate above the median. Consequently, our training data set comprises an almost equal number of neighborhoods categorized as at-risk and not-at-risk.
+
 ```{r}
-summary(all_train)
+summary(all_train_raw)
 ```
 
 ## Correlation
 
-```{r, include=FALSE}
-(
-cor_matrix <- cor(all_train)
-)
-```
-
-According to our correlation matrix, the nox, age, rad, tax, and indus variables show moderate positive correlation (>0.6).
-Additionally, the dis variable shows moderate negative correlation (< -0.6)
+Our first curiosity is if there is any strong correlation to the target variable.
+Accordingly, the nox, age, rad, tax, and indus variables show moderate positive correlation (>0.6).
+Additionally, the dis variable shows moderate negative correlation (< -0.6).
+Overall, nothing is too strongly correlated to be able to justify not building a model.
 
 ```{r}
-(
-cor_with_target <- cor_matrix["target", colnames(cor_matrix) != "target"]
-)
+cor_matrix <- cor(all_train_raw)
+cor_matrix["target", colnames(cor_matrix) != "target"]
+```
+
+However, for the big picture sense, we also need to verify that there is no multicollinearity.
+According to our visualization, the variables rad and tax may be just too closely correlated together.
+We may have to instead use PCA to create an orthogonal complement of those two variables instead.
+
+```{r}
+PlotCorrEllipse(cor_matrix)
 ```
 
 ## Data structure
@@ -91,77 +104,63 @@ cor_with_target <- cor_matrix["target", colnames(cor_matrix) != "target"]
 There are 466 observations and 13 variables in the training dataset.
 
 Additionally, there are no missing values so imputation is not necessary on this dataset.
-Our minimum sample size at n% probability would be 10*13/n so our sample size is adequate (466 > 260) where 50% of samples are expected to be over the median by definition.
 Shown below is a sample of its head.
 
 ```{r}
-str(all_train)
-```
-
-To enhance the readability of the data, we have made some adjustments. Specifically, we have converted the binary values of the "chas" variable to categorical values of "Y" and "N", indicating whether or not the neighborhood borders the Charles River. Similarly, we have converted the binary values of the "target" variable to categorical values of "Above" and "Below", based on whether the crime rate is above or below the median. As both "chas" and "target" are categorical variables, we have changed their class from integer to factor.
-
-```{r}
-all_train$chas <- as.factor(all_train$chas)
-all_train$target <- as.factor(all_train$target)
+str(all_train_raw)
 ```
 
 ## Missing values
 
 The dataset is complete with no missing values.
 
-```{r}
-nrow(all_train[is.na(all_train),])
+```{r, include=FALSE, echo=FALSE}
+nrow(all_train_raw[is.na(all_train_raw),])
 ```
 
 ## Visulization of the data set
 
-Examine the shapes and distributions of the numerical variables by visualizing their density plots.
+First, let's examine what the data looks like without separating the target variables.
+At first, we notice that indus and rad appears binomial.
+Additionally, age and nox seem to be skewed in one direction.
+Thankfully, we do not have to normalize the data until necessary because it is not an assumption for logistical regression.
 
 ```{r}
-datasub = reshape2::melt(all_train, id=c("chas", "target"))
-ggplot(datasub, aes(x = value)) + 
-    geom_density(fill = "skyblue") + 
-    facet_wrap(~variable, scales = 'free') 
+datasub = reshape2::melt(all_train_raw, id=c("target"))
+ggplot2::ggplot(datasub) +
+  ggplot2::aes(x = value) + 
+  ggplot2::geom_density(fill = "skyblue") + 
+  ggplot2::facet_wrap(~variable, scales = 'free') 
 ```
 
-For categorial variable chas, we can look at a confusion matrix table to make sure that we have enough observations for all levels:
+Next, let's examine the distribution of the features with respect to the target variable.
+Noticably, some features strongly belong to one group such as indus whereas others are more ambiguous.
+Therefore, we should expect all of the models to weigh indus heavily.
+Additionally, we can expect other boundaries to get weighed with some significance such as nox and lstat.
 
 ```{r}
-(
-confusionMatrix = xtabs(~ target + chas, data=all_train)
-)
+ggplot2::ggplot(datasub) +
+  ggplot2::aes(x = "", y = value, group = target, fill = target) +
+  ggplot2::geom_violin(adjust = 1L, scale = "area") +
+  ggplot2::coord_flip() +
+  ggplot2::theme_minimal() +
+  ggplot2::facet_wrap(ggplot2::vars(variable), scales = "free")
 ```
-
-```{r}
-# Calculate precision, recall, and F1 score
-precision <- confusionMatrix[2, 2] / sum(confusionMatrix[, 2])
-recall <- confusionMatrix[2, 2] / sum(confusionMatrix[2, ])
-f1_score <- 2 * precision * recall / (precision + recall)
-```
-
-```{r}
-# Print the results
-sprintf("Precision: %.4f", precision)
-sprintf("Recall: %.4f", recall)
-sprintf("F1 score: %.4f", f1_score)
-```
-The F1 score, which ranges from 0 to 1 and indicates the model's precision and recall, suggests that the model is not performing well. A score of 1 would indicate perfect precision and recall, while a score of 0 would indicate poor performance. With a score of 0.16, the model's performance is considered poor.
-
-Next, examine the boxplots of the numerical variables with respect to the target variable.
-
-```{r}
-ggplot(datasub, aes(x = target, y = value, fill = target)) + 
-    geom_boxplot() + 
-    facet_wrap(~variable, scales = 'free') +
-    scale_fill_manual(values = c('skyblue', '#FFC0CB'))
-```
-
 
 # Data Preparation
 
-## Outlier Imputation
+As both "chas" and "target" are categorical variables, we have changed their class from integer to factor.
 
-From the boxplots above, we can see there are many outliers so we are going to fix them by replacing with medians.
+```{r}
+all_train = all_train_raw
+all_train$chas <- as.factor(all_train$chas)
+all_train$target <- as.factor(all_train$target)
+```
+
+## Cross Validation
+
+To verify our results, we will split the available labeled data into training and validation sets.
+This will help us score our model on test data and to be able to verify the results later.
 
 ```{r}
 train_clean_pre <- all_train 
@@ -169,14 +168,6 @@ set.seed(121)
 split <- caret::createDataPartition(train_clean_pre$target, p=0.85, list=FALSE)
 train_clean <- train_clean_pre[split, ]
 validation <- train_clean_pre[ -split, ]
-```
-
-Let’s look at the boxplots again after the outliers being imputed with median.
-
-```{r}
-ggplot(reshape2::melt(train_clean, id=c("chas", "target")), aes(x = target, y = value)) + 
-    geom_boxplot() + 
-    facet_wrap(~variable, scales = 'free') 
 ```
 
 # Logistical Model Building
@@ -313,25 +304,25 @@ Our third model is the AIC backwards selection model.
 formula(modelThree)
 cv3 = VerifyKfold(modelThree, validation, "target")
 cv3
-graphics::fourfoldplot(cv3$table, color = c("#B22222", "#2E8B57"), main="Model 2")
+graphics::fourfoldplot(cv3$table, color = c("#B22222", "#2E8B57"), main="Model 3")
 ```
 
 Our fourth model is the AIC forwards selection model from model two, nicknamed 2-F in comparison to the next model.
 
 ```{r}
 formula(modelFour)
-cv4 = VerifyKfold(modelThree, validation, "target")
+cv4 = VerifyKfold(modelFour, validation, "target")
 cv4
-graphics::fourfoldplot(cv4$table, color = c("#B22222", "#2E8B57"), main="Model 2", space = 0.4)
+graphics::fourfoldplot(cv4$table, color = c("#B22222", "#2E8B57"), main = "Model 4")
 ```
 
 Our fifth model is the AIC forwards selection model from model one, nicknamed 1-F in comparison to the previous model.
 
 ```{r}
-formula(modelThree)
-cv5 = VerifyKfold(modelThree, validation, "target")
+formula(modelFive)
+cv5 = VerifyKfold(modelFive, validation, "target")
 cv5
-graphics::fourfoldplot(cv5$table, color = c("#B22222", "#2E8B57"), main="Model 2")
+graphics::fourfoldplot(cv5$table, color = c("#B22222", "#2E8B57"), main = "Model 5")
 ```
 
 
@@ -382,9 +373,10 @@ getROC <- function(model) {
          xlab="Specificity", main = name)
 }
 par(mfrow=c(2,2))
+getROC(modelOne)
 getROC(modelTwo)
 getROC(modelThree)
-getROC(modelFour)
+getROC(modelFive)
 ```
 
 Based on comparison result, we eventually choose Model 2/3 (same model)
@@ -423,4 +415,8 @@ VerifyKfold
 
 ```{r, class.output="foldable"}
 getROC
+```
+
+```{r, class.output="foldable"}
+PlotCorrEllipse
 ```
