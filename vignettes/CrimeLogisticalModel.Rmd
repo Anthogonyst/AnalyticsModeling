@@ -139,12 +139,12 @@ Therefore, we should expect all of the models to weigh indus heavily.
 Additionally, we can expect other boundaries to get weighed with some significance such as nox and lstat.
 
 ```{r}
-ggplot(datasub) +
-  aes(x = "", y = value, group = target, fill = target) +
-  geom_violin(adjust = 1L, scale = "area") +
-  coord_flip() +
-  theme_minimal() +
-  facet_wrap(vars(variable), scales = "free")
+ggplot2::ggplot(datasub) +
+  ggplot2::aes(x = "", y = value, group = target, fill = target) +
+  ggplot2::geom_violin(adjust = 1L, scale = "area") +
+  ggplot2::coord_flip() +
+  ggplot2::theme_minimal() +
+  ggplot2::facet_wrap(ggplot2::vars(variable), scales = "free")
 ```
 
 # Data Preparation
