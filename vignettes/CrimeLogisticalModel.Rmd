@@ -123,7 +123,7 @@ nrow(all_train_raw[is.na(all_train_raw),])
 Examine the shapes and distributions of the numerical variables by visualizing their density plots.
 
 ```{r}
-datasub = reshape2::melt(all_train_raw, id=c("chas", "target"))
+datasub = reshape2::melt(all_train_raw, id=c("target"))
 ggplot2::ggplot(datasub) +
   ggplot2::aes(x = value) + 
   ggplot2::geom_density(fill = "skyblue") + 
