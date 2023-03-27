@@ -149,10 +149,10 @@ all_train$chas <- as.factor(all_train$chas)
 all_train$target <- as.factor(all_train$target)
 ```
 
+## Cross Validation
 
-## Outlier Imputation
-
-From the boxplots above, we can see there are many outliers so we are going to fix them by replacing with medians.
+To verify our results, we will split the available labeled data into training and validation sets.
+This will help us score our model on test data and to be able to verify the results later.
 
 ```{r}
 train_clean_pre <- all_train 
@@ -160,14 +160,6 @@ set.seed(121)
 split <- caret::createDataPartition(train_clean_pre$target, p=0.85, list=FALSE)
 train_clean <- train_clean_pre[split, ]
 validation <- train_clean_pre[ -split, ]
-```
-
-Let’s look at the boxplots again after the outliers being imputed with median.
-
-```{r}
-ggplot(reshape2::melt(train_clean, id=c("chas", "target")), aes(x = target, y = value)) + 
-    geom_boxplot() + 
-    facet_wrap(~variable, scales = 'free') 
 ```
 
 # Logistical Model Building
