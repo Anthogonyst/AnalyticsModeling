@@ -27,15 +27,11 @@ invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source
 
 # Abstract
 
-We will evaluate data related to neighborhood crime and determine if a neighborhood is above the median crime rate.
-To do this, we will create a logistical model that rates either true or false.
-This information is necessary to determine if a neighborhood is going through difficult times or is over-policed by authorities.
-As such, our approach attempts to find a non-biased answer based on what is known.
+We will evaluate data related to neighborhood crime to create a model to predict if a neighborhood is "high crime" which we are defining as above the median crime rate. To do this, we will create a logistical model that rates either true or false.
 
 # Data Exploration
 
-The data has 12 features and 1 target variable.
-Since our model will be logistical regression, a positive result is 1 and vice versa.
+The data has 12 features and the training data set additionally has 1 target variable, which marks neighborhoods as "high crime" (target==1) or not high crime (target==0).
 
 - zn: proportion of residential land zoned for large lots (over 25000 square feet) 
 - indus: proportion of non-retail business acres per suburb 
@@ -68,7 +64,27 @@ all_test = LoadDataElseWeb("crime-evaluation-data_modified.csv", dataUrl)
 ```
 
 ```{r, include=FALSE, echo=FALSE}
-glimpse(all_train_raw)
+rename_crime <- function(df){
+  df <- df %>% 
+    dplyr::rename(
+      `Large Lot Zoning` = zn,
+      `Prop. Industrial Zoning` = indus,
+      `Borders Charles` = chas,
+      `Nitrous Oxide (pp million unit)` = nox, 
+      `Avg Rooms per Dwelling` = rm,
+      `Prop. Owner-Occupied Units Built Prior to 1940` = age, 
+      `Weighted Mean of Distances to Five Boston Employment Centers` = dis,
+      `Index of Accessibility to Radial Highways` = rad, 
+      `Property-Tax Rate per $10k` = tax, 
+      `Pupil-Teacher Ratio` = ptratio, 
+      `Percent Pop. Lower SES` = lstat,
+      `Median Value of Owner-Occupied Homes (in $1000s)` = medv, 
+      `High Crime Status` = target
+    )
+  return(df)
+}
+
+glimpse(rename_crime(all_train_raw))
 ```
 
 ## Summary Statistics
@@ -88,7 +104,8 @@ Overall, nothing is too strongly correlated to be able to justify not building a
 
 ```{r}
 cor_matrix <- cor(all_train_raw)
-cor_matrix["target", colnames(cor_matrix) != "target"]
+cor_with_target <- cor_matrix["target", colnames(cor_matrix) != "target"]
+cor_with_target
 ```
 
 However, for the big picture sense, we also need to verify that there is no multicollinearity.
