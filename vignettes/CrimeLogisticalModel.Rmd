@@ -194,7 +194,6 @@ for (col in cols_to_bin) {
   colnames(binned_col) <- col # set the column name to the variable name
   print(table(binned_col))
 }
-
 ```
 ## new variables 
 
