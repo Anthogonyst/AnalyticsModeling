@@ -162,6 +162,53 @@ all_train$target <- as.factor(all_train$target)
 To verify our results, we will split the available labeled data into training and validation sets.
 This will help us score our model on test data and to be able to verify the results later.
 
+## Outliers
+
+Based on the analysis, there were no outliers that needed to be removed as all the values appeared to be reasonable.
+
+## Buckets
+
+The code is using the summary information provided above to transform the data by putting it into "buckets" or categories. The variable cols_to_bin contains the names of the columns in the dataset that we want to bin, and breaks contains the breaks for the buckets we want to use for each variable.
+
+```{r}
+
+cols_to_bin <- c("zn", "indus", "nox", "rm", "age", "dis", "rad","tax", "ptratio", "lstat", "medv")
+
+# create the breaks for the buckets
+breaks <- list(zn = c(0, 20, 40, 60, 80, 100),
+               indus = c(0, 5, 10, 15, 20, 30),
+               nox = c(0, 0.4, 0.5, 0.6, 0.7, 0.9),
+               rm = c(0, 4, 5, 6, 7, 8, 9),
+               age = c(0, 20, 40, 60, 80, 100),
+               dis = c(0, 2, 4, 6, 8, 10, 12),
+               rad = c(0, 5, 10, 15, 20, 25, 30),
+               tax = c(0, 250, 500, 750, 1000),
+               ptratio = c(0, 14, 16, 18, 20, 22),
+               lstat = c(0, 5, 10, 15, 20, 25, 30, 40),
+               medv = c(0, 10, 20, 30, 40, 50))
+
+# loop through columns, bin data, and print frequency table
+for (col in cols_to_bin) {
+  binned_col <- cut(all_train[[col]], breaks = breaks[[col]], include.lowest = TRUE)
+  binned_col <- as.data.frame(binned_col) # convert factor to data frame
+  colnames(binned_col) <- col # set the column name to the variable name
+  print(table(binned_col))
+}
+```
+## new variables 
+
+**tax_per_room (tpr)** variable would represent the insights into the relationship between the cost of living in a particular area and the size of the living space. A higher value of **tax_per_room (tpr)** means that the tax rate is higher relative to the number of rooms in the dwelling.
+
+**age_dis_ratio(adr)** can help identify areas that have an older housing inventory and are farther from job centers, which may affect preference for those locations.
+
+```{r}
+all_train <- all_train %>% 
+             mutate(tpr = tax / rm,
+                    adr = age / dis)
+                    
+head(all_train)
+```
+
 ```{r}
 train_clean_pre <- all_train 
 set.seed(121)
