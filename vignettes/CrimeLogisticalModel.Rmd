@@ -23,6 +23,7 @@ library(lattice)
 library(purrr)
 library(kableExtra)
 library(stringr)
+library(ellipse)
 invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source))
 ```
 
@@ -88,13 +89,25 @@ rename_crime <- function(df){
 glimpse(rename_crime(all_train_raw))
 ```
 
+# Data Preparation
+
+To enhance the readability of the data, we have made some adjustments. Specifically, we have converted the binary values of the `chas` variable to categorical values of "Y" and "N", indicating whether or not the neighborhood borders the Charles River. Similarly, we have converted the binary values of the `target` variable to categorical values of "Above" and "Below", based on whether the crime rate is above or below the median. As both `chas` and `target` are categorical variables, we have changed their class from integer to factor.
+
+As both `chas` and `target` are categorical variables, we have changed their class from integer to factor.
+
+```{r}
+all_train = all_train_raw
+all_train$chas <- as.factor(all_train$chas)
+all_train$target <- as.factor(all_train$target)
+```
+
+
 ## Summary Statistics
 
 Upon analyzing the target variable, we observe that 237 out of the total observations have a crime rate below the median, whereas 229 have a crime rate above the median. Consequently, our training data set comprises an almost equal number of neighborhoods categorized as at-risk and not-at-risk.
 
 ```{r}
 summary(rename_crime(all_train))
-
 ```
 
 ## Correlation
@@ -105,8 +118,8 @@ Additionally, the dis variable shows moderate negative correlation (< -0.6).
 Overall, nothing is too strongly correlated to be able to justify not building a model.
 
 ```{r}
-cor_matrix <- cor(rename_crime(all_train))
-cor_with_target <- cor_matrix["High Crime Status", colnames(cor_matrix) != "High Crime Status"]
+cor_matrix <- cor(all_train_raw)
+cor_with_target <- cor_matrix["target", colnames(cor_matrix) != "target"]
 
 cor_with_target
 ```
@@ -127,18 +140,6 @@ Additionally, there are no missing values so imputation is not necessary on this
 
 Our minimum sample size at n% probability would be 10*13/n so our sample size is adequate (466 > 260) where 50% of samples are expected to be over the median by definition.
 
-To enhance the readability of the data, we have made some adjustments. Specifically, we have converted the binary values of the `chas` variable to categorical values of "Y" and "N", indicating whether or not the neighborhood borders the Charles River. Similarly, we have converted the binary values of the `target` variable to categorical values of "Above" and "Below", based on whether the crime rate is above or below the median. As both `chas` and `target` are categorical variables, we have changed their class from integer to factor.
-
-```{r}
-all_train$chas <- as.factor(all_train$chas)
-all_train$target <- as.factor(all_train$target)
-```
-
-Shown below is a sample of its head.
-
-```{r}
-str(all_train_raw)
-```
 
 ## Missing values
 
@@ -156,9 +157,9 @@ Additionally, `age` and `NOx` seem to be skewed in one direction.
 Thankfully, we do not have to normalize the data until necessary because it is not an assumption for logistical regression.
 
 ```{r}
-datasub <-  reshape2::melt(rename_crime(all_train), id=c("Borders Charles", "High Crime Status"))
+datasub <-  reshape2::melt(all_train, id=c("chas", "target"))
 
-ggplot(datasub, aes(x = value)) + 
+ggplot(reshape2::melt(rename_crime(all_train_raw), id=c("Borders Charles", "High Crime Status")), aes(x = value)) + 
     geom_density(fill = "skyblue") + 
     facet_wrap(~variable, scales = 'free', labeller=label_wrap_gen(width = 15, multi_line = TRUE)) 
 ```
@@ -166,7 +167,7 @@ ggplot(datasub, aes(x = value)) +
 For categorical variable `chas` (which measures proximity to the Charles River), we can look at a confusion matrix table to make sure that we have enough observations for all levels:
 
 ```{r}
-confusionMatrix = xtabs(~ target + chas, data=all_train)
+confusionMatrix = xtabs(~ target + chas, data=all_train_raw)
 confusionMatrix
 ```
 
@@ -182,16 +183,6 @@ ggplot2::ggplot(datasub) +
   ggplot2::coord_flip() +
   ggplot2::theme_minimal() +
   ggplot2::facet_wrap(ggplot2::vars(variable), scales = "free")
-```
-
-# Data Preparation
-
-As both `chas` and `target` are categorical variables, we have changed their class from integer to factor.
-
-```{r}
-all_train = all_train_raw
-all_train$chas <- as.factor(all_train$chas)
-all_train$target <- as.factor(all_train$target)
 ```
 
 ## Cross Validation
