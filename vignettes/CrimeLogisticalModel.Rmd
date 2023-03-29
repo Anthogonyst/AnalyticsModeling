@@ -22,6 +22,7 @@ library(caret)
 library(lattice)
 library(purrr)
 library(kableExtra)
+library(stringr)
 ```
 
 # Abstract
@@ -61,12 +62,12 @@ rename_crime <- function(df){
       `Nitrous Oxide (pp million unit)` = nox, 
       `Avg Rooms per Dwelling` = rm,
       `Prop. Owner-Occupied Units Built Prior to 1940` = age, 
-      `Weighted Mean of Distances to Five Boston Employment Centers` = dis,
+      `Weighted Mean Distance to Boston Employment Centers` = dis,
       `Index of Accessibility to Radial Highways` = rad, 
       `Property-Tax Rate per $10k` = tax, 
-      `Pupil-Teacher Ratio` = ptratio, 
+      `Student-Teacher Ratio` = ptratio, 
       `Percent Pop. Lower SES` = lstat,
-      `Median Value of Owner-Occupied Homes (in $1000s)` = medv, 
+      `Med. Val. of Owner-Occupied Homes ($1ks)` = medv, 
       `High Crime Status` = target
     )
   return(df)
@@ -84,7 +85,7 @@ glimpse(rename_crime(all_train))
 Upon analyzing the target variable, we observe that 237 out of the total observations have a crime rate below the median, whereas 229 have a crime rate above the median. Consequently, our training data set comprises an almost equal number of neighborhoods categorized as at-risk and not-at-risk.
 
 ```{r}
-summary(all_train)
+summary(rename_crime(all_train))
 ```
 
 ## Correlation
@@ -93,8 +94,8 @@ According to our correlation matrix, the nox, age, rad, tax, and indus variables
 Additionally, the dis variable shows moderate negative correlation (< -0.6)
 
 ```{r}
-cor_matrix <- cor(all_train)
-cor_with_target <- cor_matrix["target", colnames(cor_matrix) != "target"]
+cor_matrix <- cor(rename_crime(all_train))
+cor_with_target <- cor_matrix["High Crime Status", colnames(cor_matrix) != "High Crime Status"]
 cor_with_target
 ```
 
@@ -104,13 +105,8 @@ There are 466 observations and 13 variables in the training dataset.
 
 Additionally, there are no missing values so imputation is not necessary on this dataset.
 Our minimum sample size at n% probability would be 10*13/n so our sample size is adequate (466 > 260) where 50% of samples are expected to be over the median by definition.
-Shown below is a sample of its head.
 
-```{r}
-str(all_train)
-```
-
-To enhance the readability of the data, we have made some adjustments. Specifically, we have converted the binary values of the "chas" variable to categorical values of "Y" and "N", indicating whether or not the neighborhood borders the Charles River. Similarly, we have converted the binary values of the "target" variable to categorical values of "Above" and "Below", based on whether the crime rate is above or below the median. As both "chas" and "target" are categorical variables, we have changed their class from integer to factor.
+To enhance the readability of the data, we have made some adjustments. Specifically, we have converted the binary values of the `chas` variable to categorical values of "Y" and "N", indicating whether or not the neighborhood borders the Charles River. Similarly, we have converted the binary values of the `target` variable to categorical values of "Above" and "Below", based on whether the crime rate is above or below the median. As both `chas` and `target` are categorical variables, we have changed their class from integer to factor.
 
 ```{r}
 all_train$chas <- as.factor(all_train$chas)
@@ -130,18 +126,21 @@ nrow(all_train[is.na(all_train),])
 Examine the shapes and distributions of the numerical variables by visualizing their density plots.
 
 ```{r}
-datasub = reshape2::melt(all_train, id=c("chas", "target"))
+datasub <-  reshape2::melt(rename_crime(all_train), id=c("Borders Charles", "High Crime Status"))
+
 ggplot(datasub, aes(x = value)) + 
     geom_density(fill = "skyblue") + 
-    facet_wrap(~variable, scales = 'free') 
+    facet_wrap(~variable, scales = 'free', labeller=label_wrap_gen(width = 15, multi_line = TRUE)) 
+
+
 ```
 
-For categorial variable chas, we can look at a confusion matrix table to make sure that we have enough observations for all levels:
+For categorical variable `chas` (which measures proximity to the Charles River), we can look at a confusion matrix table to make sure that we have enough observations for all levels:
 
 ```{r}
-(
+
 confusionMatrix = xtabs(~ target + chas, data=all_train)
-)
+confusionMatrix
 ```
 
 ```{r}
