@@ -299,16 +299,78 @@ modelFour <- MASS::stepAIC(modelTwo, direction = "forward", trace = FALSE)
 summary(modelFour)
 ```
 
-This fifth model, nicknamed 1-F, when compared to the previous model, 2-F, goes from AIC 210 to 201.
-Therefore, it should hypothetically be better.
-However, we will use hypothesis testing to accept or deny this model since we only want to change our model when it is statistically significant.
+# Model Selection
 
-```{r}
-modelFive <- MASS::stepAIC(modelOne, direction = "forward", trace = FALSE)
-summary(modelFive)
+We previously realized that our models beat the null hypothesis so now we have some potentially successful models.
+To compare logistical models, we can assess accuracy, precision, deviance, AIC, and so on.
+It's not clear whether we should prefer precision or specificity here so we will use the derived F1 metric.
+So first, we will do chi square testing to prove the statistical validity of the models and then look at F1 to replace old models.
+
+```{r, include=FALSE}
+MakePredictions <- function(model, testData, excludeCol = "target", threshold = 0.5) {
+  probability = stats::predict(model, testData[, ! colnames(testData) %in% excludeCol])
+  class = probability %>%
+    { .[. > threshold] = 1 ; . } %>%
+      { .[. <= threshold] = 0 ; . } %>%
+        as.factor(.)
+
+  data.frame(class, probability)
+}
+
+VerifyKfold <- function(model, testData, excludeCol = "target", threshold = 0.5) {
+  MakePredictions(model, testData, excludeCol, threshold) %>%
+    { caret::confusionMatrix(.$class, testData[, colnames(testData) %in% excludeCol], mode = "everything") }
+}
+
+ValidationPipeline <- function(model, testData, excludeCol, plotname = "", threshold = 0.5) {
+  p = MakePredictions(model, testData, excludeCol)
+  d = VerifyKfold(model, testData, excludeCol)
+  g = graphics::fourfoldplot(d$table, color = c("#B22222", "#2E8B57"), main = plotname)
+  
+  print(formula(model))
+  print(d)
+  print(g)
+  
+  invisible(list(p, d, g))
+}
+
+CompareModelStats <- function(testData, excludeCol = "target", ..., threshold = 0.5) {
+  models = list(...)
+  
+  # sapply(models, function(x) {
+  #   as.numeric(MakePredictions(x, validation, targetCol)$class == validation[[targetCol]])
+  # })
+  lapply(models, VerifyKfold, testData, excludeCol, threshold) %>%
+    lapply(., function(x) {
+      c(x$byClass["F1"], x$overall["Accuracy"], x$table[1, 1], x$table[1, 2], x$table[2, 1], x$table[2, 2]) %>%
+        magrittr::set_names(., c("F1", "Accuracy", "TP", "FP", "FN", "TN"))
+    }) %>%
+      do.call(rbind, .)
+}
 ```
 
-# Model Selection
+Accordingly, the residual deviance for the full model is 172.
+The next two models have 0.34 and 0.066 significance value.
+Since our alpha value is 0.05, these two models are not significant enough to replace the old model.
+The last model's p value is low enough to be relevant but the residual deviance is too high to warrant replacing it.
+Therefore, model 1 is our final model.
+
+```{r}
+stats::anova(test = "Chisq", modelOne, modelTwo, modelThree, modelFour)
+```
+
+These are the statistics for all of the models in case we were curious.
+We would use this table to verify the F1 value if a new model were to pass the previous tests.
+
+```{r}
+CompareModelStats(validation, "target", modelOne, modelTwo, modelThree, modelFour)
+```
+
+Shown below is a tabulated form and visualization of our final model.
+
+```{r}
+ValidationPipeline(modelOne, validation, "target", "Model 1")
+```
 
 # Conclusions and Final Thoughts
 
