@@ -265,37 +265,41 @@ summary(modelOne)
 
 ## Model 2 - P-values Selection
 
-Before we begin stepwise addition and subtraction, let's also run a model with only variables with significance below 0.05 value.
+Before we begin stepwise addition and subtraction, let's also run a model with only variables with significance below 0.1 value.
 This will give us a good baseline for later analysis.
+We expect that the previously strong features will persist but the weaker features may undergo interesting changes.
+Here, most of the features stayed the same as before, except nox scaled up much lower along with the intercept.
 
 ```{r}
-modelTwo <- stats::glm(target ~ nox + age + rad + tax + ptratio + lstat, 
-               data = train_clean, 
-               family = 'binomial')
+modelTwo <- stats::glm(
+  target ~ nox + age + rad + tax + ptratio + medv + adr, 
+  data = train_clean, family = 'binomial'
+)
 summary(modelTwo)
 ```
 
-## Model 3 - Backward Selection
+## Model 3 - Backward Selection from Full Model
 
-Next, let's use the AIC scoring mechanism to do backwards stepwise addition.
-This will give us more variables to compare as long as the threshold is below a significant point.
-
-# TODO: Elaborate.
+Next, let's use the AIC scoring mechanism to do stepwise subtraction.
+This will give us a subset of variables at a local maximum.
+Generally speaking, it's difficult to find an absolute maximum but random search helps.
+Therefore, we will keep this local maximum that we obtain from stepwise selection on the full model.
 
 ```{r}
-modelThree <- MASS::stepAIC(modelTwo, direction = "backward", trace = FALSE)
+modelThree <- MASS::stepAIC(modelOne, direction = "backward", trace = FALSE)
 summary(modelThree)
 ```
 
-## Model 4 & 5 - Forward Selection
+## Model 4 - Forward Stepwise from No Features
 
-Finally, let's use that same AIC scoring mechanism to do forwards stepwise subtraction.
+Finally, let's use that same AIC scoring mechanism to do forward stepwise addition.
 This will reduce some of the extra variables we added while still constraining ourselves to the most optimal fit.
-Notably, when we run forward selection on our second model, it reaches a local maximum and stops.
-However, if we run forwards AIC on model one, it reaches a different local maximum with a lower AIC than this one.
+Notably, when we run forward selection on our previous model, it reaches the same step previously and stops.
+Therefore, let's instead run it from a no feature model.
 
 ```{r}
-modelFour <- MASS::stepAIC(modelTwo, direction = "forward", trace = FALSE)
+modelFour <- stats::glm(target ~ nox, data = train_clean, family = 'binomial') %>%
+  MASS::stepAIC(., direction = "forward", trace = FALSE)
 summary(modelFour)
 ```
 
