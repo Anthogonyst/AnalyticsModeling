@@ -238,27 +238,25 @@ validation <- train_clean_pre[ -split, ]
 
 To begin, we will create a null model that does not make any prediction.
 This will help us verify our first model works better than random guessing.
-If we set our alpha value to 0.05 as common, the p value of almost 1 greatly exceeds it.
-We hope to at least have a model with a p value below 0.05 to deem it statistically valuable.
+Therefore, the first model that beats the residual deviance of 646 will be our first model candidate.
 
 ```{r nullModel}
 lmNull = rep(0, nrow(all_train["target"])) %>%
   { .[1] = 1 ; . } %>%
     as.factor(.) %>%
       cbind(., all_train["target"]) %>%
-        magrittr::set_colnames(., c("X", "y")) %>%
-          stats::glm(y ~ X, data = ., family = 'binomial')
+        magrittr::set_colnames(., c("X", "target")) %>%
+          stats::glm(target ~ NULL, data = ., family = 'binomial')
 
-summary.lm(lmNull)
+summary.glm(lmNull)
 ```
 
 ## Model 1 - Full Model
 
 We will start with a top-down approach and begin by including all of the variables.
 According to this, our most statistically consistent variables are those with extremely low p-values.
-Notably, the variables nox and rad both have very high significance bellow 0.001 so we will definitely use these in the future.
-
-# TODO: Insert explanation about why this beats the null model
+Notably, the variables nox and rad both have very high significance below 0.001 so we will definitely use these in the future.
+Thankfully, the AIC and residual deviance are better than the null model already, so we are off to a good start.
 
 ```{r}
 modelOne <- stats::glm(target ~ ., data = train_clean, family = 'binomial')
