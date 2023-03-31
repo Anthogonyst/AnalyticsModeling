@@ -249,27 +249,25 @@ validation <- train_clean_pre[ -split, ]
 
 To begin, we will create a null model that does not make any prediction.
 This will help us verify our first model works better than random guessing.
-If we set our alpha value to 0.05 as common, the p value of almost 1 greatly exceeds it.
-We hope to at least have a model with a p value below 0.05 to deem it statistically valuable.
+Therefore, the first model that beats the residual deviance of 646 will be our first model candidate.
 
 ```{r nullModel}
 lmNull = rep(0, nrow(all_train["target"])) %>%
   { .[1] = 1 ; . } %>%
     as.factor(.) %>%
       cbind(., all_train["target"]) %>%
-        magrittr::set_colnames(., c("X", "y")) %>%
-          stats::glm(y ~ X, data = ., family = 'binomial')
+        magrittr::set_colnames(., c("X", "target")) %>%
+          stats::glm(target ~ NULL, data = ., family = 'binomial')
 
-summary.lm(lmNull)
+summary.glm(lmNull)
 ```
 
 ## Model 1 - Full Model
 
 We will start with a top-down approach and begin by including all of the variables.
 According to this, our most statistically consistent variables are those with extremely low p-values.
-Notably, the variables nox and rad both have very high significance bellow 0.001 so we will definitely use these in the future.
-
-# TODO: Insert explanation about why this beats the null model
+Notably, the variables nox and rad both have very high significance below 0.001 so we will definitely use these in the future.
+Thankfully, the AIC and residual deviance are better than the null model already, so we are off to a good start.
 
 ```{r}
 modelOne <- stats::glm(target ~ ., data = train_clean, family = 'binomial')
@@ -278,52 +276,50 @@ summary(modelOne)
 
 ## Model 2 - P-values Selection
 
-Before we begin stepwise addition and subtraction, let's also run a model with only variables with significance below 0.05 value.
+Before we begin stepwise addition and subtraction, let's also run a model with only variables with significance below 0.1 value.
 This will give us a good baseline for later analysis.
+We expect that the previously strong features will persist but the weaker features may undergo interesting changes.
+Here, most of the features stayed the same as before, except nox scaled up much lower along with the intercept.
 
 ```{r}
-modelTwo <- stats::glm(target ~ nox + age + rad + tax + ptratio + lstat, 
-               data = train_clean, 
-               family = 'binomial')
+modelTwo <- stats::glm(
+  target ~ nox + age + rad + tax + ptratio + medv + adr, 
+  data = train_clean, family = 'binomial'
+)
 summary(modelTwo)
 ```
 
-## Model 3 - Backward Selection
+## Model 3 - Backward Selection from Full Model
 
-Next, let's use the AIC scoring mechanism to do backwards stepwise addition.
-This will give us more variables to compare as long as the threshold is below a significant point.
-
-# TODO: Elaborate.
+Next, let's use the AIC scoring mechanism to do stepwise subtraction.
+This will give us a subset of variables at a local maximum.
+Generally speaking, it's difficult to find an absolute maximum but random search helps.
+Therefore, we will keep this local maximum that we obtain from stepwise selection on the full model.
 
 ```{r}
-modelThree <- MASS::stepAIC(modelTwo, direction = "backward", trace = FALSE)
+modelThree <- MASS::stepAIC(modelOne, direction = "backward", trace = FALSE)
 summary(modelThree)
 ```
 
-## Model 4 & 5 - Forward Selection
+## Model 4 - Forward Stepwise from No Features
 
-Finally, let's use that same AIC scoring mechanism to do forwards stepwise subtraction.
+Finally, let's use that same AIC scoring mechanism to do forward stepwise addition.
 This will reduce some of the extra variables we added while still constraining ourselves to the most optimal fit.
-Notably, when we run forward selection on our second model, it reaches a local maximum and stops.
-However, if we run forwards AIC on model one, it reaches a different local maximum with a lower AIC than this one.
+Notably, when we run forward selection on our previous model, it reaches the same step previously and stops.
+Therefore, let's instead run it from a no feature model.
 
 ```{r}
-modelFour <- MASS::stepAIC(modelTwo, direction = "forward", trace = FALSE)
+modelFour <- stats::glm(target ~ nox, data = train_clean, family = 'binomial') %>%
+  MASS::stepAIC(., direction = "forward", trace = FALSE)
 summary(modelFour)
-```
-
-This fifth model, nicknamed 1-F, when compared to the previous model, 2-F, goes from AIC 210 to 201.
-Therefore, it should hypothetically be better.
-However, we will use hypothesis testing to accept or deny this model since we only want to change our model when it is statistically significant.
-
-```{r}
-modelFive <- MASS::stepAIC(modelOne, direction = "forward", trace = FALSE)
-summary(modelFive)
 ```
 
 # Model Selection
 
-Our first model for consideration is the full model.
+We previously realized that our models beat the null hypothesis so now we have some potentially successful models.
+To compare logistical models, we can assess accuracy, precision, deviance, AIC, and so on.
+It's not clear whether we should prefer precision or specificity here so we will use the derived F1 metric.
+So first, we will do chi square testing to prove the statistical validity of the models and then look at F1 to replace old models.
 
 ```{r, include=FALSE}
 MakePredictions <- function(model, testData, excludeCol = "target", threshold = 0.5) {
@@ -353,118 +349,42 @@ ValidationPipeline <- function(model, testData, excludeCol, plotname = "", thres
   invisible(list(p, d, g))
 }
 
-ValidationPipeline(modelOne, validation, "target", "Model 1")
-```
-
-```{r}
-formula(modelOne)
-predictions = MakePredictions(modelOne, validation, "target")
-cv1 = VerifyKfold(modelOne, validation, "target")
-cv1
-graphics::fourfoldplot(cv1$table, color = c("#B22222", "#2E8B57"), main="Model 1")
-```
-
-Our second model for consideration is the manually selected p values model.
-
-```{r}
-formula(modelTwo)
-cv2 = VerifyKfold(modelTwo, validation, "target")
-cv2
-graphics::fourfoldplot(cv2$table, color = c("#B22222", "#2E8B57"), main="Model 2")
-```
-
-Our third model is the AIC backwards selection model.
-
-```{r}
-formula(modelThree)
-cv3 = VerifyKfold(modelThree, validation, "target")
-cv3
-graphics::fourfoldplot(cv3$table, color = c("#B22222", "#2E8B57"), main="Model 3")
-```
-
-Our fourth model is the AIC forwards selection model from model two, nicknamed 2-F in comparison to the next model.
-
-```{r}
-formula(modelFour)
-cv4 = VerifyKfold(modelFour, validation, "target")
-cv4
-graphics::fourfoldplot(cv4$table, color = c("#B22222", "#2E8B57"), main = "Model 4")
-```
-
-Our fifth model is the AIC forwards selection model from model one, nicknamed 1-F in comparison to the previous model.
-
-```{r}
-formula(modelFive)
-cv5 = VerifyKfold(modelFive, validation, "target")
-cv5
-graphics::fourfoldplot(cv5$table, color = c("#B22222", "#2E8B57"), main = "Model 5")
-```
-
-
-accuracy and lower error rate
-
-```{r}
-temp <- data.frame(cv1$overall,
-                   cv2$overall,
-                   cv3$overall,
-                   cv4$overall,
-                   cv5$overall) %>%
-  t() %>%
-  data.frame() %>%
-  dplyr::select(Accuracy) %>%
-  mutate(Classification_Error_Rate = 1 - Accuracy)
-Summ_Stat <- data.frame(cv1$byClass,
-                        cv2$byClass,
-                        cv3$byClass,
-                        cv4$byClass,
-                        cv5$byClass) %>%
-  t() %>%
-  data.frame() %>%
-  cbind(temp) %>%
-  mutate(Model = c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5")) %>%
-  dplyr::select(Model,
-                Accuracy,
-                Classification_Error_Rate,
-                Precision,
-                Sensitivity,
-                Specificity,
-                F1) %>%
-  mutate_if(is.numeric, round, 3)# %>%
-#kable('html', escape = F) %>%
-#kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),full_width = F)
-Summ_Stat
-```
-
-Model 2,3 has better AUC
-
-```{r}
-getROC <- function(model) {
-    name <- deparse(substitute(model))
-    pred.prob1 <- predict(model, newdata = validation)
-    p1 <- data.frame(pred = validation$target, prob = pred.prob1)
-    p1 <- p1[order(p1$prob),]
-    rocobj <- pROC::roc(p1$pred, p1$prob, levels = c(0, 1), direction = "<")
-    plot(rocobj, asp=NA, legacy.axes = TRUE, print.auc=TRUE,
-         xlab="Specificity", main = name)
+CompareModelStats <- function(testData, excludeCol = "target", ..., threshold = 0.5) {
+  models = list(...)
+  
+  # sapply(models, function(x) {
+  #   as.numeric(MakePredictions(x, validation, targetCol)$class == validation[[targetCol]])
+  # })
+  lapply(models, VerifyKfold, testData, excludeCol, threshold) %>%
+    lapply(., function(x) {
+      c(x$byClass["F1"], x$overall["Accuracy"], x$table[1, 1], x$table[1, 2], x$table[2, 1], x$table[2, 2]) %>%
+        magrittr::set_names(., c("F1", "Accuracy", "TP", "FP", "FN", "TN"))
+    }) %>%
+      do.call(rbind, .)
 }
-par(mfrow=c(2,2))
-getROC(modelOne)
-getROC(modelTwo)
-getROC(modelThree)
-getROC(modelFive)
 ```
 
-Based on comparison result, we eventually choose Model 2/3 (same model)
-
-Make Prediction
+Accordingly, the residual deviance for the full model is 172.
+The next two models have 0.34 and 0.066 significance value.
+Since our alpha value is 0.05, these two models are not significant enough to replace the old model.
+The last model's p value is low enough to be relevant but the residual deviance is too high to warrant replacing it.
+Therefore, model 1 is our final model.
 
 ```{r}
-all_test$chas <- as.factor(all_test$chas)
-prediction = predict(modelThree, newdata = all_test)
-prediction[prediction >= 0.5] <- 1
-prediction[prediction < 0.5] <- 0
-prediction = as.factor(prediction)
-prediction
+stats::anova(test = "Chisq", modelOne, modelTwo, modelThree, modelFour)
+```
+
+These are the statistics for all of the models in case we were curious.
+We would use this table to verify the F1 value if a new model were to pass the previous tests.
+
+```{r}
+CompareModelStats(validation, "target", modelOne, modelTwo, modelThree, modelFour)
+```
+
+Shown below is a tabulated form and visualization of our final model.
+
+```{r}
+ValidationPipeline(modelOne, validation, "target", "Model 1")
 ```
 
 # Conclusions and Final Thoughts
