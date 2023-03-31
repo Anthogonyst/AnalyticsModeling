@@ -1,6 +1,6 @@
 ---
 title: "Crime Logistical Model"
-author: "Anthony A, IvanTikhonov, Seung min song, Alice A. Friedman"
+author: "Anthony A, Ivan Tikhonov, Seung min song, Alice A. Friedman"
 date: "`r format(Sys.time(), '%m/%d/%Y')`"
 output: 
   pdf_document:
@@ -137,10 +137,10 @@ nrow(all_train_raw[is.na(all_train_raw),])
 
 ## Visulization of the data set
 
-First, let's examine what the data looks like without separating the target variables.
-At first, we notice that indus and rad appears binomial.
-Additionally, age and nox seem to be skewed in one direction.
-Thankfully, we do not have to normalize the data until necessary because it is not an assumption for logistical regression.
+Let's examine what the data looks like without separating the target variables.
+At first, we notice that `indus` and `rad` appear binomial.
+Additionally, `age` and `nox` seem to be skewed in one direction.
+We do not have to normalize the data until necessary because it is not a necessary condition for logistical regression.
 
 ```{r}
 datasub = reshape2::melt(all_train_raw, id=c("target"))
@@ -151,9 +151,13 @@ ggplot2::ggplot(datasub) +
 ```
 
 Next, let's examine the distribution of the features with respect to the target variable.
-Noticably, some features strongly belong to one group such as indus whereas others are more ambiguous.
-Therefore, we should expect all of the models to weigh indus heavily.
-Additionally, we can expect other boundaries to get weighed with some significance such as nox and lstat.
+Shown below, in light blue are the distributions of the features where crime is high (`target` is 1), and in dark blue are the distributions where crime is low. 
+
+Noticeably, some features strongly show a difference between the two plots, such as `indus` whereas others are more similar.
+We should expect all of the models to weigh `indus` heavily.
+Additionally, we can expect other features with notable differences to get weighed with some significance such as `nox` and `lstat` and `rad`.
+Features like `chas`, where the distributions are nearly identical, are not likely targets for the model.
+This makes sense, as there is no obvious causal reason why bordering the Charles River should affect crime.
 
 ```{r}
 ggplot2::ggplot(datasub) +
@@ -166,7 +170,7 @@ ggplot2::ggplot(datasub) +
 
 # Data Preparation
 
-As both "chas" and "target" are categorical variables, we have changed their class from integer to factor.
+As both `chas` and `target` are categorical variables, we have changed their class from integer to factor.
 
 ```{r}
 all_train = all_train_raw
@@ -185,7 +189,8 @@ Based on the analysis, there were no outliers that needed to be removed as all t
 
 ## Buckets
 
-The code is using the summary information provided above to transform the data by putting it into "buckets" or categories. The variable cols_to_bin contains the names of the columns in the dataset that we want to bin, and breaks contains the breaks for the buckets we want to use for each variable.
+The code is using the summary information provided above to transform the data by putting it into "buckets" or categories.
+The variable `cols_to_bin` contains the names of the columns in the dataset that we want to bin, and breaks contains the breaks for the buckets we want to use for each variable.
 
 ```{r}
 
@@ -212,7 +217,7 @@ for (col in cols_to_bin) {
   print(table(binned_col))
 }
 ```
-## new variables 
+## New Variables 
 
 **tax_per_room (tpr)** variable would represent the insights into the relationship between the cost of living in a particular area and the size of the living space. A higher value of **tax_per_room (tpr)** means that the tax rate is higher relative to the number of rooms in the dwelling.
 
@@ -255,7 +260,8 @@ summary.glm(lmNull)
 
 We will start with a top-down approach and begin by including all of the variables.
 According to this, our most statistically consistent variables are those with extremely low p-values.
-Notably, the variables nox and rad both have very high significance below 0.001 so we will definitely use these in the future.
+Notably, the variables `nox` and `rad` both have very high significance below 0.001 so we will definitely use these in the future.
+This is expected based on their distributions with respect to the target variable, above.
 Thankfully, the AIC and residual deviance are better than the null model already, so we are off to a good start.
 
 ```{r}
@@ -378,7 +384,7 @@ ValidationPipeline(modelOne, validation, "target", "Model 1")
 
 # Conclusions and Final Thoughts
 
-None at all.
+TO DO Don't we want to use the information from the plots to inform our choice of model? Or some logical intepretation of the data?
 
 # References
 
