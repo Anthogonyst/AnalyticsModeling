@@ -59,8 +59,8 @@ Going forward, for our research question we ask "is the crime present in this ne
 ```{r, include=FALSE, echo=FALSE}
 dataUrl = "https://github.com/Anthogonyst/AnalyticsModeling/tree/master/data"
 
-all_train_raw = LoadDataElseWeb("crime-training-data_modified.csv", dataUrl)
-all_test = LoadDataElseWeb("crime-evaluation-data_modified.csv", dataUrl)
+all_train_raw <- read_csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-training-data_modified.csv")
+all_test <- read_csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-evaluation-data_modified.csv")
 ```
 
 ```{r, include=FALSE, echo=FALSE}
