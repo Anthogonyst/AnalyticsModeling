@@ -1,6 +1,6 @@
 ---
-title: "Crime Logistical Model, Homework #3, Group#5"
-author: "Anthony A, Ivan Tikhonov, Seung min song, Alice A. Friedman, Charles Ugiabe"
+title: "Crime Logistical Model, Homework #3, Group #5"
+author: "Anthony A, Alice A. Friedman, Seung min song"
 date: "`r format(Sys.time(), '%m/%d/%Y')`"
 output: 
   pdf_document:
@@ -472,6 +472,9 @@ ValidationPipeline(modelTwo, validation, "target", "Model 1")
 
 In the real world, accuracy, specificity, and sensitivity are all factors worth considering, but so, too, is the cost to gather and host input data and the processing time to run complex models. Because these factors are important, we have selected a simpler model than one which provides slightly superior results.
 
+All of our models highly select for nitrogen oxide concentration (`nox`) so we assume that it is a byproduct of population. Additional indicators of poverty are a low number of rooms per dwelling (`rm`) and apparently distance to an accessible highway (`rad`) is also another. Part of our responsibility to our community is giving the proper equity so that logistical means for garbage cleaning and public transportation are accounted for.
+
+
 # References
 
 Datasets are provided by CUNY School of Professional Studies for academic purposes.
@@ -490,7 +493,7 @@ VerifyKfold
 ```
 
 ```{r, class.output="foldable"}
-#getROC
+ValidationPipeline
 ```
 
 ```{r, class.output="foldable"}
