@@ -8,7 +8,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, cache=TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
 ```{r libraries, include=FALSE, warning=FALSE, class.output="scroll-less"}
@@ -479,6 +479,7 @@ Probability <- probabilities2
 print(data.frame(Prediction, Probability, Actual))
 
 ```
+
 # Conclusions and Final Thoughts
 
 In the real world, accuracy, specificity, and sensitivity are all factors worth considering, but so, too, is the cost to gather and host input data and the processing time to run complex models. Because these factors are important, we have selected a simpler model than one which provides slightly superior results.
@@ -495,18 +496,18 @@ It is reflective of public data gathered online.
 
 Shown here is a copy of all relevant R code.
 
-```{r, class.output="foldable"}
+```{r, echo=TRUE, class.output="foldable"}
 MakePredictions
 ```
 
-```{r, class.output="foldable"}
+```{r, echo=TRUE, class.output="foldable"}
 VerifyKfold
 ```
 
-```{r, class.output="foldable"}
+```{r, echo=TRUE, class.output="foldable"}
 ValidationPipeline
 ```
 
-```{r, class.output="foldable"}
+```{r, echo=TRUE, class.output="foldable"}
 PlotCorrEllipse
 ```
