@@ -73,7 +73,7 @@ all_test <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW
 ```
 
 ```{r, include=FALSE, echo=FALSE}
-rename_crime <- function(df){
+RenameCrime <- function(df){
   df <- df %>% 
     dplyr::rename(
       `Large Lot Zoning` = zn,
@@ -93,7 +93,7 @@ rename_crime <- function(df){
   return(df)
 }
 
-glimpse(rename_crime(all_train_raw))
+dplyr::glimpse(RenameCrime(all_train_raw))
 ```
 
 ## Summary Statistics
@@ -111,9 +111,9 @@ Accordingly, the `nox`, `age`, `rad`, `tax`, and `indus` variables show moderate
 Additionally, the `dis` variable shows moderate negative correlation with the target(< -0.6).
 
 ```{r}
-cor_matrix <- cor(all_train_raw)
+cor_matrix <- stats::cor(all_train_raw)
 cor_with_target <- cor_matrix["target", colnames(cor_matrix) != "target"]
-cor_with_target %>% kable()
+cor_with_target %>% kableExtra::kable()
 ```
 
 However, to verify our assumptions to run logistical regression, we also need to verify that there is no multicollinearity.
@@ -150,7 +150,7 @@ PlotCorrEllipse <- function(corData, pal = RColorBrewer::brewer.pal(5, "Spectral
 }
 
 PlotCorrEllipse(cor_matrix)
-cor_matrix %>% kable()
+cor_matrix %>% kableExtra::kable()
 
 ```
 
@@ -257,10 +257,10 @@ for (col in cols_to_bin) {
 **age_dis_ratio(adr)** can help identify areas that have an older housing inventory and are farther from job centers, which may affect preference for those locations.
 
 ```{r}
-all_train <- all_train %>% 
-             mutate(tpr = tax / rm,
-                    adr = age / dis)
-                    
+all_train <- all_train %>%
+  dplyr::mutate(tpr = tax / rm,
+                adr = age / dis)
+
 head(all_train)
 ```
 
@@ -286,7 +286,7 @@ lmNull = rep(0, nrow(all_train["target"])) %>%
         magrittr::set_colnames(., c("X", "target")) %>%
           stats::glm(target ~ NULL, data = ., family = 'binomial')
 
-summary.glm(lmNull)
+stats::summary.glm(lmNull)
 ```
 
 ## Model 1 - Full Model
@@ -305,7 +305,7 @@ modelOne <- stats::glm(target ~ ., data = train_clean, family="binomial")
 summary(modelOne) 
 
 #make predictions
-probabilities1 <- modelOne %>% predict(validation, type = "response")
+probabilities1 <- modelOne %>% stats::predict(validation, type = "response")
 predicted.classes1 <- ifelse(probabilities1 > 0.5, 1, 0) %>% as.factor()
 # Model accuracy
 confusionMatrix(predicted.classes1, validation$target)
@@ -345,7 +345,7 @@ modelTwo <- stats::glm(
 
 summary(modelTwo) 
 
-probabilities2 <- modelTwo %>% predict.glm(validation, type = "response")
+probabilities2 <- modelTwo %>% stats::predict.glm(validation, type = "response")
 predicted.classes2 <- ifelse(probabilities2 > 0.5, 1, 0) %>% as.factor()
 # Model accuracy
 confusionMatrix(predicted.classes2, validation$target)
@@ -361,11 +361,12 @@ Therefore, we will keep this local maximum that we obtain from stepwise selectio
 Interestingly, this provides us with the same model as Model 2!
 
 ```{r}
-modelThree <- glm(target ~., data = train_clean, family = "binomial") %>% MASS::stepAIC(direction = "backward", trace = FALSE)
+modelThree <- glm(target ~., data = train_clean, family = "binomial") %>% 
+  MASS::stepAIC(direction = "backward", trace = FALSE)
 
 summary(modelThree)
 
-probabilities3 <- modelThree %>% predict(validation, type = "response")
+probabilities3 <- modelThree %>% stats::predict(validation, type = "response")
 predicted.classes3 <- ifelse(probabilities3 > 0.5, 1, 0) %>% as.factor()
 # Model accuracy
 confusionMatrix(predicted.classes3, validation$target)
