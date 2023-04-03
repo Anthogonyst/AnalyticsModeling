@@ -1,6 +1,6 @@
 ---
 title: "Crime Logistical Model, Homework #3, Group #5"
-author: "Anthony A, Alice A. Friedman, Seung min song"
+author: "Anthony A, Alice A. Friedman, Seung min song, Charles Ugiabe"
 date: "`r format(Sys.time(), '%m/%d/%Y')`"
 output: 
   pdf_document:
@@ -345,7 +345,7 @@ modelTwo <- stats::glm(
 
 summary(modelTwo) 
 
-probabilities2 <- modelTwo %>% predict(validation, type = "response")
+probabilities2 <- modelTwo %>% predict.glm(validation, type = "response")
 predicted.classes2 <- ifelse(probabilities2 > 0.5, 1, 0) %>% as.factor()
 # Model accuracy
 confusionMatrix(predicted.classes2, validation$target)
@@ -465,9 +465,20 @@ Because the predicted values are ultimately the same across models, the selected
 Shown below is a tabulated form and visualization of our final model.
 
 ```{r}
-ValidationPipeline(modelTwo, validation, "target", "Model 1")
+ValidationPipeline(modelTwo, validation, "target", "Model 2")
 ```
 
+## Selected Model Predicted Vs. Actual
+Shown below are the predictions for each neighborhood based on the final model.
+
+```{r, predict}
+Prediction <- predicted.classes2
+Actual <- validation$target
+Probability <- probabilities2
+
+print(data.frame(Prediction, Probability, Actual))
+
+```
 # Conclusions and Final Thoughts
 
 In the real world, accuracy, specificity, and sensitivity are all factors worth considering, but so, too, is the cost to gather and host input data and the processing time to run complex models. Because these factors are important, we have selected a simpler model than one which provides slightly superior results.
