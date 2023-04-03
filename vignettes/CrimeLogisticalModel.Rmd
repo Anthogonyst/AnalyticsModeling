@@ -68,8 +68,8 @@ Going forward, for our research question we ask "is the crime present in this ne
 
 ```{r, include=FALSE, echo=FALSE}
 
-all_train_raw <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-training-data_modified.csv")
-all_test <- read.csv("https://raw.githubusercontent.com/IvanGrozny88/DATA-621-HW3/main/crime-evaluation-data_modified.csv")
+all_train_raw = LoadDataElseWeb("crime-training-data_modified.csv", dataUrl)
+all_test = LoadDataElseWeb("crime-evaluation-data_modified.csv", dataUrl)
 ```
 
 ```{r, include=FALSE, echo=FALSE}
@@ -385,7 +385,7 @@ Therefore, let's instead run it from a no feature model. As shown below, this is
 modelFour <- modelOne %>% MASS::stepAIC(direction = "both", trace=FALSE)
 summary(modelFour)
 
-probabilities4 <- modelFour %>% predict(validation, type = "response")
+probabilities4 <- modelFour %>% stats::predict(validation, type = "response")
 predicted.classes4 <- ifelse(probabilities4 > 0.5, 1, 0) %>% as.factor()
 # Model accuracy
 confusionMatrix(predicted.classes4, validation$target)
