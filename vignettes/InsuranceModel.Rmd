@@ -1,0 +1,38 @@
+---
+title: "Starter Workbench"
+author: "Anthony A"
+date: "`r format(Sys.time(), '%m/%d/%Y')`"
+output: 
+  pdf_document:
+    pandoc_args: --listings
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+(function() { set.seed(8675309) })()
+invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source))
+
+library(magrittr)
+library(here)
+
+rawData = LoadDataElseWeb("insurance_training_data.csv", "../data/")
+rawTestData = LoadDataElseWeb("insurance-evaluation-data.csv", "../data/")
+```
+
+# Abstract
+# Data Exploration
+
+```{r}
+head(rawData, 3)
+```
+
+```{r}
+PlotCorrEllipse(stats::cor(rawData[, sapply(rawData, is.numeric)], use = "na.or.complete"))
+```
+
+# Data Transformations
+# Model Building
+# Selecting Best Model
+# Conclusions and Suggestions
+# References
+# Appendix
