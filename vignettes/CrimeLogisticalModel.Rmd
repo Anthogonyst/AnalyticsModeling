@@ -67,6 +67,7 @@ When we do logistical regression, we have to consider our assumptions and then v
 Going forward, for our research question we ask "is the crime present in this neighborhood above the median rate?"
 
 ```{r, include=FALSE, echo=FALSE}
+dataUrl = "https://github.com/Anthogonyst/AnalyticsModeling/tree/master/data"
 
 all_train_raw = LoadDataElseWeb("crime-training-data_modified.csv", dataUrl)
 all_test = LoadDataElseWeb("crime-evaluation-data_modified.csv", dataUrl)
