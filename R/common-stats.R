@@ -1,41 +1,53 @@
 
-#
 
-##### Linear Regression Assumptions #####
+library(reshape2)
+library(ggplot2)
+library(RColorBrewer)
+library(grDevices)
 
+
+##### Distribution #####
+
+#' Plots the distribution of variables in a dataset
+#' The visualization is a violin plot across facets with optional boxplot and groupings
+#'
+#' @param df The dataframe
+#' @param targetCol Optional; grouping column
+#' @param showBoxPlot Default true; adds a small boxplot for quantiles
+#' @param extend Optional; default null; a ggproto object to append to the visualization
 #' @author Anthogonyst
-PlotLinearity <- function(lm_calc, col = "#FF464A", extend = NULL) {
-  ggplot2::ggplot(data = lm_calc) +
-  ggplot2::aes(x = lm_calc$fitted.values, y = lm_calc$residuals) +
-  ggplot2::geom_jitter(width = 0.01, color = col) +
-  ggplot2::geom_hline(yintercept = 0, linetype = "dashed") +
-  ggplot2::xlab("Fitted values") +
-  ggplot2::ylab("Residuals") +
-  ggplot2::theme(legend.position = "none") +
-  extend
+PlotVarDistribution <- function(df, targetCol = NULL, showBoxPlot = TRUE, extend = NULL) {
+  meltDf = reshape2::melt(df[, sapply(df, is.numeric) | colnames(df) %in% targetCol], 
+                          id = targetCol, value.name = "value") 
+  
+  if (showBoxPlot) {
+    return(
+      ggplot2::ggplot(meltDf[! is.na(meltDf["value"]), ]) +
+        ggplot2::aes(x = variable, y = value) +
+        ggplot2::aes_string(group = targetCol) +
+        ggplot2::geom_violin(adjust = 1L, scale = "area", fill = "#FF464A") +
+        ggplot2::geom_boxplot(width = 0.1) +
+        extend +
+        ggplot2::theme_minimal() +
+        ggplot2::facet_wrap(~variable, scales = "free")
+    )
+  } else {
+    return(
+      ggplot2::ggplot(meltDf[! is.na(meltDf["value"]), ]) +
+        ggplot2::aes(x = variable, y = value) +
+        ggplot2::aes_string(group = targetCol) +
+        ggplot2::geom_violin(adjust = 1L, scale = "area", fill = "#FF464A") +
+        extend +
+        ggplot2::theme_minimal() +
+        ggplot2::facet_wrap(~variable, scales = "free")
+    )
+  }
 }
 
-#' @author Anthogonyst
-PlotDistribution <- function(lm_calc, col = "#FF464A", extend = NULL) {
-  ggplot2::ggplot(data = lm_calc) +
-  ggplot2::aes(x = lm_calc$residuals, y = "") + 
-  ggplot2::geom_violin(adjust = 1L, scale = "area", fill = col, show.legend = FALSE) +
-  ggplot2::xlab("Residuals") +
-  ggplot2::ylab("Distribution") +
-  extend
-}
-
-#' @author Anthogonyst
-PlotQQuantile <- function(lm_calc, col = "#FF464A", extend = NULL) {
-  ggplot2::ggplot(data = lm_calc) +
-  ggplot2::aes(sample = lm_calc$residuals) +
-  ggplot2::stat_qq(color = col) +
-  ggplot2::theme(legend.position = "none") +
-  extend
-}
 
 ##### Correlation #####
 
+#' Creates a visualization of a correlation matrix
 #' @author Anthogonyst
 PlotCorrEllipse <- function(corData, pal = RColorBrewer::brewer.pal(5, "Spectral"),
                             highlight = c("both", "positive", "negative")[1], hiMod = 1) {
@@ -65,6 +77,7 @@ PlotCorrEllipse <- function(corData, pal = RColorBrewer::brewer.pal(5, "Spectral
 
 ##### Classification #####
 
+#' Creates an annotated table similar to caret::confusionMatrix
 #' @author Anthogonyst
 ClassificationInfo <- function(df, applyTable = FALSE, verbose = FALSE) {
   if (applyTable) {
