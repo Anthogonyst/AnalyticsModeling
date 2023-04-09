@@ -23,7 +23,68 @@ rawTestData = LoadDataElseWeb("insurance-evaluation-data.csv", "../data/")
 # Data Exploration
 
 ```{r}
-head(rawData, 3)
+head(rawData)
+sapply(rawData, class)
+```
+
+## Tidy Data
+
+After carefully examining the data in the rawData data frame, it was found that certain variables contained unnecessary characters such as **$**, **z_**, **<** which could potentially hinder further analysis. To address this issue, regular expression (regex) was used to remove these unwanted characters from the variables. By doing so, the data is now cleaner and more suitable for analysis. 
+```{r}
+# create a vector of column names in rawData
+col_names <- names(rawData)
+
+# loop through each column and remove '$' and 'z_'
+for (col in col_names) {
+   rawData[[col]] <- gsub("\\$|z_|<", "", rawData[[col]])
+}
+head(rawData)
+sapply(rawData, class)
+```
+
+change "no" to 0 and "yes" to 1 for the columns **MSTATUS**, **RED_CAR**, **REVOKED**, and **PARENT1**. 
+
+Convert the following columns to integer data type: KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, and CAR_AGE.
+
+```{r echo=FALSE}
+rawData$MSTATUS <- as.integer(rawData$MSTATUS == "Yes")
+rawData$RED_CAR <- as.integer(rawData$RED_CAR == "yes")
+rawData$REVOKED <- as.integer(rawData$REVOKED == "Yes")
+rawData$PARENT1 <- as.integer(rawData$PARENT1 == "Yes")
+
+rawData$KIDSDRIV <- as.integer(rawData$KIDSDRIV)
+rawData$AGE <- as.integer(rawData$AGE)
+rawData$HOMEKIDS <- as.integer(rawData$HOMEKIDS)
+rawData$YOJ <- as.integer(rawData$YOJ)
+rawData$INCOME <- as.integer(rawData$INCOME)
+rawData$HOME_VAL <- as.integer(rawData$HOME_VAL)
+rawData$BLUEBOOK<- as.integer(rawData$BLUEBOOK)
+rawData$TIF <- as.integer(rawData$TIF)
+rawData$OLDCLAIM <- as.integer(rawData$OLDCLAIM)
+rawData$CLM_FREQ <- as.integer(rawData$CLM_FREQ)
+rawData$MVR_PTS <- as.integer(rawData$MVR_PTS)
+rawData$CAR_AGE <- as.integer(rawData$CAR_AGE)
+```
+
+```{r}
+summary(select(rawData, -INDEX))
+```
+
+## Missing values
+
+The rawData data frame contains 4506 missing values.
+```{r}
+nrow(rawData[is.na(rawData),])
+```
+
+The following variables in the dataset have missing values: **TARGET_FLAG**, **TARGET_AMT**, **AGE**, **YOJ**, and **CAR_AGE**. It is important to address these missing values before proceeding with any analysis.
+```{r}
+colSums(is.na(rawData))
+```
+
+Replace missing values in the YOJ column of the rawData data frame with **0**.
+```{r}
+rawData$YOJ <- ifelse(is.na(rawData$YOJ), 0, rawData$YOJ)
 ```
 
 ```{r}
