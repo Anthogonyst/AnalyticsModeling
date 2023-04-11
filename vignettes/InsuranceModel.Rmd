@@ -29,17 +29,19 @@ sapply(rawData, class)
 
 ## Tidy Data
 
-After carefully examining the data in the rawData data frame, it was found that certain variables contained unnecessary characters such as **$**, **z_**, **<** which could potentially hinder further analysis. To address this issue, regular expression (regex) was used to remove these unwanted characters from the variables. By doing so, the data is now cleaner and more suitable for analysis. 
+After carefully examining the data in the rawData data frame, it was found that certain variables contained unnecessary characters such as **$**, **z_**, **<**, **,** and 1 at the end of columm named **PARENT1** which could potentially hinder further analysis. To address this issue, regular expression (regex) was used to remove these unwanted characters from the variables. By doing so, the data is now cleaner and more suitable for analysis. 
 ```{r}
 # create a vector of column names in rawData
 col_names <- names(rawData)
 
-# loop through each column and remove '$' and 'z_'
+# loop through each column and remove '$' and 'z_' and '<' and ','
 for (col in col_names) {
-   rawData[[col]] <- gsub("\\$|z_|<", "", rawData[[col]])
+   rawData[[col]] <- gsub("\\$|z_|<|,", "", rawData[[col]])
 }
+
+rawData$PARENT1 <- gsub("1$", "", rawData$PARENT1)
+
 head(rawData)
-sapply(rawData, class)
 ```
 
 change "no" to 0 and "yes" to 1 for the columns **MSTATUS**, **RED_CAR**, **REVOKED**, and **PARENT1**. 
@@ -47,27 +49,23 @@ change "no" to 0 and "yes" to 1 for the columns **MSTATUS**, **RED_CAR**, **REVO
 Convert the following columns to integer data type: KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, and CAR_AGE.
 
 ```{r echo=FALSE}
-rawData$MSTATUS <- as.integer(rawData$MSTATUS == "Yes")
-rawData$RED_CAR <- as.integer(rawData$RED_CAR == "yes")
-rawData$REVOKED <- as.integer(rawData$REVOKED == "Yes")
-rawData$PARENT1 <- as.integer(rawData$PARENT1 == "Yes")
+rawData$MSTATUS <- as.numeric(rawData$MSTATUS == "Yes")
+rawData$RED_CAR <- as.numeric(rawData$RED_CAR == "Yes")
+rawData$REVOKED <- as.numeric(rawData$REVOKED == "Yes")
+rawData$PARENT1 <- as.numeric(rawData$PARENT1 == "Yes")
 
-rawData$KIDSDRIV <- as.integer(rawData$KIDSDRIV)
-rawData$AGE <- as.integer(rawData$AGE)
-rawData$HOMEKIDS <- as.integer(rawData$HOMEKIDS)
-rawData$YOJ <- as.integer(rawData$YOJ)
-rawData$INCOME <- as.integer(rawData$INCOME)
-rawData$HOME_VAL <- as.integer(rawData$HOME_VAL)
-rawData$BLUEBOOK<- as.integer(rawData$BLUEBOOK)
-rawData$TIF <- as.integer(rawData$TIF)
-rawData$OLDCLAIM <- as.integer(rawData$OLDCLAIM)
-rawData$CLM_FREQ <- as.integer(rawData$CLM_FREQ)
-rawData$MVR_PTS <- as.integer(rawData$MVR_PTS)
-rawData$CAR_AGE <- as.integer(rawData$CAR_AGE)
-```
-
-```{r}
-summary(select(rawData, -INDEX))
+rawData$KIDSDRIV <- as.numeric(rawData$KIDSDRIV)
+rawData$AGE <- as.numeric(rawData$AGE)
+rawData$HOMEKIDS <- as.numeric(rawData$HOMEKIDS)
+rawData$YOJ <- as.numeric(rawData$YOJ)
+rawData$INCOME <- as.numeric(rawData$INCOME)
+rawData$HOME_VAL <- as.numeric(rawData$HOME_VAL)
+rawData$BLUEBOOK<- as.numeric(rawData$BLUEBOOK)
+rawData$TIF <- as.numeric(rawData$TIF)
+rawData$OLDCLAIM <- as.numeric(rawData$OLDCLAIM)
+rawData$CLM_FREQ <- as.numeric(rawData$CLM_FREQ)
+rawData$MVR_PTS <- as.numeric(rawData$MVR_PTS)
+rawData$CAR_AGE <- as.numeric(rawData$CAR_AGE)
 ```
 
 ## Missing values
@@ -81,14 +79,144 @@ The following variables in the dataset have missing values: **TARGET_FLAG**, **T
 ```{r}
 colSums(is.na(rawData))
 ```
+### AGE
 
-Replace missing values in the YOJ column of the rawData data frame with **0**.
+Based on the available data, it seems that YOJ tends to increase with age. There is one missing value in the AGE column, which has a corresponding YOJ value of 9. Given the available information, it is reasonable to predict that the missing age value is around 45. Insert the predicted values of AGE 45 into the original dataframe
+
 ```{r}
-rawData$YOJ <- ifelse(is.na(rawData$YOJ), 0, rawData$YOJ)
+p <-  as.data.frame(9)
+colnames(p) <- "YOJ"
 ```
 
 ```{r}
-PlotCorrEllipse(stats::cor(rawData[, sapply(rawData, is.numeric)], use = "na.or.complete"))
+model1 <- lm(AGE ~ YOJ, data = rawData)
+predict(model1, newdata = p)
+```
+
+```{r}
+rawData$AGE <- ifelse(is.na(rawData$AGE), 45, rawData$AGE)
+```
+
+```{r}
+AGE_df <-rawData %>%
+  filter(!is.na(YOJ)) %>%
+      group_by(AGE, SEX) %>% 
+      select(-c('INDEX', 'TARGET_FLAG', 'TARGET_AMT')) %>%
+      summarize_all(mean)
+AGE_df
+```
+
+```{r}
+AGE_df %>% 
+    ggplot(aes(x = AGE, y = YOJ, shape =SEX, colour = SEX)) + 
+       stat_smooth(se = TRUE, method = lm) +
+        geom_point(aes(x = AGE, y = YOJ, colour = SEX), size = 2.5) +
+            ggtitle("Total YOJ vs Age separated with Sex") +
+              theme_minimal()
+
+```
+
+### YOJ
+
+Build the linear regression model with AGE as the predictor and YOJ as the response and predict the missing values of YOJ based on the values of AGE. Insert the predicted values of YOJ into the original dataframe.
+```{r}
+# Subset the data with missing values of YOJ
+missing_YOJ <- subset(rawData, is.na(YOJ))
+
+lm_model <- lm(YOJ ~ AGE, data = rawData)
+
+predicted_YOJ <- predict(lm_model, newdata = missing_YOJ)
+
+rounded_YOJ <- round(predicted_YOJ, digits = 0)
+rawData$YOJ[is.na(rawData$YOJ)] <- rounded_YOJ
+
+
+```
+
+### Income
+
+Build the linear regression model with AGE and YOJ as the predictors and INCOME as the response and predict the missing values of INCOME based on the values of AGE and YOJ. insert the predicted values of INCOME into the original dataframe.
+```{r}
+# Subset the data with missing values of INCOME
+missing_INCOME <- subset(rawData, is.na(INCOME))
+
+lm_model <- lm(INCOME ~ AGE + YOJ, data = rawData)
+
+predicted_INCOME <- predict(lm_model, newdata = missing_INCOME)
+
+rounded_INCOME <- round(predicted_INCOME, digits = 0)
+rawData[is.na(rawData$INCOME),]$INCOME <- rounded_INCOME
+
+```
+
+### Home-val
+
+Build the linear regression model with AGE, YOJ, and INCOME as predictors and HOME_VAL as the response and predict the missing values of HOME_VAL based on the values of AGE, YOJ, and INCOME. Insert the predicted values of HOME_VAL into the original dataframe
+```{r}
+# Subset the data with missing values of HOME_VAL
+missing_HOME_VAL <- subset(rawData, is.na(HOME_VAL))
+
+
+lm_model <- lm(HOME_VAL ~ AGE + YOJ + INCOME, data = rawData)
+
+
+predicted_HOME_VAL <- predict(lm_model, newdata = missing_HOME_VAL)
+
+#rounded_HOME_VAL <- round(predicted_HOME_VAL, digits = 0)
+rawData[is.na(rawData$HOME_VAL),]$HOME_VAL <- predicted_HOME_VAL
+rawData$HOME_VAL <- round(rawData$HOME_VAL, digits = 0)
+
+print(rawData$HOME_VAL)
+```
+
+### Car Age
+
+To handle the missing value in CAR_AGE, I have decided to replace it with the value 1. This is because I do not have enough information to accurately predict the missing value.
+
+```{r}
+rawData$CAR_AGE[is.na(rawData$CAR_AGE)] <- 1
+```
+
+## Summary
+
+```{r}
+summary(select(rawData, -INDEX))
+```
+
+## Box-plot
+
+We have 971 male and 1170 female in this study. Male average income is higher than man. However, man has highest car purchase amount. The boxplots show that the medians and interquartile range of the two distributions are very close.
+```{r}
+SEX_df <- rawData %>% 
+  filter(!is.na(INCOME)) %>%
+        group_by(SEX) %>% 
+        summarise(INCOME = mean(INCOME))
+SEX_df
+```
+
+```{r}
+ggplot(rawData, aes(x = SEX, y = INCOME, color = SEX, fill = SEX)) +
+  geom_bar(data = SEX_df, stat = "identity", alpha = .3) + 
+    ggrepel::geom_text_repel(aes(label = HOME_VAL), color = "black", size = 2.5, segment.color = "grey") +
+      geom_point() +
+        guides(color = "none", fill = "none") +
+        theme_bw() +
+        labs(
+          title = "Income by Sex",
+          x = "Sex",
+          y = "Income"
+        )
+```
+
+## Visulization of the data set
+
+```{r}
+datasub <- reshape2::melt(rawData)
+ggplot2::ggplot(datasub) +
+  ggplot2::aes(x = value) + 
+  ggplot2::geom_density(fill = "skyblue") + 
+  ggplot2::facet_wrap(~variable, scales = 'free')
+
 ```
 
 # Data Transformations
