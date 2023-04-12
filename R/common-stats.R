@@ -15,17 +15,34 @@ library(grDevices)
 #' @param targetCol Optional; grouping column
 #' @param showBoxPlot Default true; adds a small boxplot for quantiles
 #' @param extend Optional; default null; a ggproto object to append to the visualization
+#' 
+#' @examples
+#' \dontrun{
+#'
+#' data(iris)
+#' PlotVarDistribution(iris, "Species", showBoxPlot = FALSE)
+#' 
+#' data(Sacramento)
+#' PlotVarDistribution(Sacramento)
+#' }
 #' @author Anthogonyst
 PlotVarDistribution <- function(df, targetCol = NULL, showBoxPlot = TRUE, extend = NULL) {
+  
   meltDf = reshape2::melt(df[, sapply(df, is.numeric) | colnames(df) %in% targetCol], 
                           id = targetCol, value.name = "value") 
+  noGroupColor = if (is.null(targetCol)) { "#FF464A" } else { NULL }
+  
+  # TODO: geom_violin(fill = NULL) crashes
+  # TODO: boxplots over many graphs puts them in wrong position too close to center
+  # When above two bugs are fixed, we may delete below line
+  showBoxPlot = if (is.null(targetCol)) { showBoxPlot } else { FALSE }
   
   if (showBoxPlot) {
     return(
       ggplot2::ggplot(meltDf[! is.na(meltDf["value"]), ]) +
         ggplot2::aes(x = variable, y = value) +
         ggplot2::aes_string(group = targetCol) +
-        ggplot2::geom_violin(adjust = 1L, scale = "area", fill = "#FF464A") +
+        ggplot2::geom_violin(adjust = 1L, scale = "area", fill = noGroupColor) +
         ggplot2::geom_boxplot(width = 0.1) +
         extend +
         ggplot2::theme_minimal() +
@@ -35,8 +52,8 @@ PlotVarDistribution <- function(df, targetCol = NULL, showBoxPlot = TRUE, extend
     return(
       ggplot2::ggplot(meltDf[! is.na(meltDf["value"]), ]) +
         ggplot2::aes(x = variable, y = value) +
-        ggplot2::aes_string(group = targetCol) +
-        ggplot2::geom_violin(adjust = 1L, scale = "area", fill = "#FF464A") +
+        ggplot2::aes_string(group = targetCol, fill = targetCol) +
+        ggplot2::geom_violin(adjust = 1L, scale = "area") +
         extend +
         ggplot2::theme_minimal() +
         ggplot2::facet_wrap(~variable, scales = "free")
