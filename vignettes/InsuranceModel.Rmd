@@ -190,10 +190,12 @@ print(rawData$HOME_VAL)
 
 ### Car Age
 
-To handle the missing value in CAR_AGE, I have decided to replace it with the value 1. This is because I do not have enough information to accurately predict the missing value.
+To handle the missing value in CAR_AGE, we will use chained imputation since it is difficult to assess. This will also fill any other data that is still missing so we now have produced our final cleaning steps. We may next consider doing manipulations such as normalization, zero centering, and other kinds of feature engineering.
 
 ```{r}
-rawData$CAR_AGE[is.na(rawData$CAR_AGE)] <- 1
+rawData = rawData %>%
+  mice::mice(., method = "pmm", printFlag = FALSE) %>%
+    mice::complete(.)
 ```
 
 ## Summary
