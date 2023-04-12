@@ -33,43 +33,58 @@ sapply(rawData, class)
 
 ## Tidy Data
 
-After carefully examining the data in the rawData data frame, it was found that certain variables contained unnecessary characters such as **$**, **z_**, **<**, **,** and 1 at the end of columm named **PARENT1** which could potentially hinder further analysis. To address this issue, regular expression (regex) was used to remove these unwanted characters from the variables. By doing so, the data is now cleaner and more suitable for analysis. 
-```{r}
-# create a vector of column names in rawData
-col_names <- names(rawData)
+After carefully examining the data in the raw data frame, it was found that certain variables contained unnecessary characters such as dollar signs and garbage data. To address this issue, regular expression (regex) was used to remove these unwanted characters from the variables. By doing so, the data is now cleaner and more suitable for analysis.
 
-# loop through each column and remove '$' and 'z_' and '<' and ','
-for (col in col_names) {
-   rawData[[col]] <- gsub("\\$|z_|<|,", "", rawData[[col]])
+Additionally, there are several nominal categories that are yes and no questions. We reduced this to factors using regex again to further simplify the process.
+
+```{r clean-funcs}
+SilentMutateAt <- function(df, dirtyCols = c("Sample", "Text"), FUN, ...) {
+  ind = colnames(df) %in% dirtyCols
+  df[, ind] = sapply(df[, ind], FUN = FUN, ... = ...)
+  
+  df
 }
 
-rawData$PARENT1 <- gsub("1$", "", rawData$PARENT1)
+GsubPipe <- function(x, pattern, replacement, ...) {
+  gsub(pattern, replacement, x, ...)
+}
 
-head(rawData)
-```
+CleanYesNo <- function(df, trace = FALSE, threshold = 0.5) {
+  yesNoCols = sapply(df, function(x) { 
+    unique(x) %>% 
+      grepl("yes|no|^y$|^n$", ., ignore.case = T) %>% 
+        { sum(.) / length(.) } %>%
+          { . >= threshold }
+  }) %>%
+    .[.] %>%
+      names(.)
+  
+  result = SilentMutateAt(df, yesNoCols, function(x) {
+    truthy = as.integer(grepl("yes|^y$", x, ignore.case = T))
+    truthy = truthy - as.integer(grepl("no|^n$", x, ignore.case = T))
+    
+    truthy[truthy == 0L] = NA
+    truthy[truthy == -1L] = 0L
+    
+    truthy
+  })
+  
+  if (trace) {
+    return(list(result, yesNoCols))
+  }
+  
+  return(result)
+}
 
-change "no" to 0 and "yes" to 1 for the columns **MSTATUS**, **RED_CAR**, **REVOKED**, and **PARENT1**. 
+CleanInsuranceStrings <- function(df) {
+  SilentMutateAt(df, colnames(df)[sapply(df, is.character)], GsubPipe, "\\$|z_|<|,", "") %>%
+    CleanYesNo(.) %>%
+      SilentMutateAt(c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM"), as.numeric) %>%
+        SilentMutateAt(., "JOB", function(x) { x[x == ""] = NA ; x })
+}
 
-Convert the following columns to integer data type: KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, and CAR_AGE.
-
-```{r echo=FALSE}
-rawData$MSTATUS <- as.numeric(rawData$MSTATUS == "Yes")
-rawData$RED_CAR <- as.numeric(rawData$RED_CAR == "Yes")
-rawData$REVOKED <- as.numeric(rawData$REVOKED == "Yes")
-rawData$PARENT1 <- as.numeric(rawData$PARENT1 == "Yes")
-
-rawData$KIDSDRIV <- as.numeric(rawData$KIDSDRIV)
-rawData$AGE <- as.numeric(rawData$AGE)
-rawData$HOMEKIDS <- as.numeric(rawData$HOMEKIDS)
-rawData$YOJ <- as.numeric(rawData$YOJ)
-rawData$INCOME <- as.numeric(rawData$INCOME)
-rawData$HOME_VAL <- as.numeric(rawData$HOME_VAL)
-rawData$BLUEBOOK<- as.numeric(rawData$BLUEBOOK)
-rawData$TIF <- as.numeric(rawData$TIF)
-rawData$OLDCLAIM <- as.numeric(rawData$OLDCLAIM)
-rawData$CLM_FREQ <- as.numeric(rawData$CLM_FREQ)
-rawData$MVR_PTS <- as.numeric(rawData$MVR_PTS)
-rawData$CAR_AGE <- as.numeric(rawData$CAR_AGE)
+cleanData = CleanInsuranceStrings(rawData)
+rawData = CleanInsuranceStrings(rawData)
 ```
 
 ## Missing values
