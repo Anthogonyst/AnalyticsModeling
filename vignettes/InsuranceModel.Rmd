@@ -230,12 +230,7 @@ ggplot(rawData, aes(x = SEX, y = INCOME, color = SEX, fill = SEX)) +
 ## Visulization of the data set
 
 ```{r}
-datasub <- reshape2::melt(rawData)
-ggplot2::ggplot(datasub) +
-  ggplot2::aes(x = value) + 
-  ggplot2::geom_density(fill = "skyblue") + 
-  ggplot2::facet_wrap(~variable, scales = 'free')
-
+PlotVarDistribution(rawData[, c(-1, -2, -3)], showBoxPlot = TRUE)
 ```
 
 # Data Transformations
