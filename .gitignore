@@ -40,3 +40,6 @@ vignettes/*.pdf
 
 # Mac files
 *.DS_Store
+
+# R Proj file
+*.Rproj
