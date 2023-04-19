@@ -197,6 +197,7 @@ To handle the missing value in CAR_AGE, we will use chained imputation since it 
 rawData = rawData %>%
   mice::mice(., method = "pmm", printFlag = FALSE) %>%
     mice::complete(.)
+trainClean = rawData
 ```
 
 ## Summary
