@@ -28,3 +28,29 @@ RemoveCols <- function(df, columns, invert = FALSE) {
     df[, -which(colnames(df) %in% columns)]
   }
 }
+
+#' Produces multiplicative components for easy feature engineering between variables
+#' 
+#' @param df The dataframe
+#' @param dropCols Optional; abstains specific numerical columns when creating derived columns
+#' @examples 
+#' \dontrun{
+#' data(iris)
+#' renamedIris = magrittr::set_colnames(iris, c("A", "B", "C", "D", "Words")) %>% 
+#' 
+#' expandedData = cbind(renamedIris, CrossProdFeatures(renamedIris, dropCols = c("A")))
+#' 
+#' resultColumns = c("A", "B", "C", "D", "Words", "B\*C", "B\*D", "C\*D")
+#' resultColumns == colnames(expandedData)
+#' }
+#' @author Anthogonyst
+CrossProdFeatures <- function(df, dropCols = NULL) {
+  numDf = df[, sapply(df, is.numeric) & ! sapply(df, is.factor) & ! colnames(df) %in% dropCols]
+  # Suggestion: Redo to not iterate duplicate columns in the first place
+  goal = sapply(numDf, function(x) { as.matrix(numDf) * rep(as.matrix(x), ncol(numDf)) }, simplify = FALSE) %>% do.call(cbind, .)
+  namae = sapply(colnames(numDf), function(x) { paste0(x, "*", colnames(numDf)) }, simplify = FALSE)
+  pruneDupes = reshape2::melt(t(upper.tri(do.call(cbind, namae))), id = NULL, value.name = "vals")[["vals"]]
+  
+  dimnames(goal)[[2]] = magrittr::set_names(unlist(namae), NULL)
+  as.data.frame(goal)[, pruneDupes]
+}
