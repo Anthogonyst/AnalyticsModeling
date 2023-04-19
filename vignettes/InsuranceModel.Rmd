@@ -233,8 +233,18 @@ ggplot(rawData, aes(x = SEX, y = INCOME, color = SEX, fill = SEX)) +
 
 ## Visulization of the data set
 
+Our features span a multitude of different distribtuions. Many of them are normal, others are binomial, and others are nominal. How we handle each feature will thus influence future analysis. 
+
 ```{r}
-PlotVarDistribution(rawData[, c(-1, -2, -3)], showBoxPlot = TRUE)
+PlotVarDistribution(trainClean[, c(-1, -2, -3)], showBoxPlot = TRUE)
+```
+
+## Visualization of Correlation
+
+According to this correlation matrix, all of the features are not strongly correlated to each other. With this in mind, we will go forward and assume that potentially every feature is a principal component and we will not exclude any until further downstream analysis is conducted.
+
+```{r}
+PlotCorrEllipse(stats::cor(rawData[, sapply(trainClean, is.numeric)] %>% .[, c(-1, -2, -3)], use = "na.or.complete"))
 ```
 
 # Data Transformations
