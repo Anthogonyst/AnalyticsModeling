@@ -186,7 +186,7 @@ predicted_HOME_VAL <- predict(lm_model, newdata = missing_HOME_VAL)
 rawData[is.na(rawData$HOME_VAL),]$HOME_VAL <- predicted_HOME_VAL
 rawData$HOME_VAL <- round(rawData$HOME_VAL, digits = 0)
 
-print(rawData$HOME_VAL)
+head(rawData$HOME_VAL)
 ```
 
 ### Car Age
