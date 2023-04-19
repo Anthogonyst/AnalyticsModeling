@@ -118,10 +118,11 @@ rawData$AGE <- ifelse(is.na(rawData$AGE), 45, rawData$AGE)
 
 ```{r}
 AGE_df <-rawData %>%
-  filter(!is.na(YOJ)) %>%
-      group_by(AGE, SEX) %>% 
-      select(-c('INDEX', 'TARGET_FLAG', 'TARGET_AMT')) %>%
-      summarize_all(mean)
+  .[, ! sapply(., is.character) | colnames(.) == "SEX"] %>%
+    dplyr::filter(!is.na(YOJ)) %>%
+      dplyr::group_by(AGE, SEX) %>%
+        dplyr::select(-c('INDEX', 'TARGET_FLAG', 'TARGET_AMT')) %>%
+          dplyr::summarize_all(mean)
 AGE_df
 ```
 
