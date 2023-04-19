@@ -248,6 +248,20 @@ PlotCorrEllipse(stats::cor(rawData[, sapply(trainClean, is.numeric)] %>% .[, c(-
 ```
 
 # Data Transformations
+
+For our model, we will explore using power transforms on our model where features A and B can create a derived feature A*B. We have previously verified that there is very low colinearity in our data so this will be safe to use, although it will raise our computation effort.
+
+```{r}
+nominalCols = c("KIDSDRIV", "HOMEKIDS", "CLM_FREQ")
+binomialCols = c("PARENT1", "MSTATUS", "RED_CAR", "REVOKED")
+transformedData = cbind(trainClean, CrossProdFeatures(trainClean, dropCols = c(
+  "INDEX", "TARGET_FLAG", "TARGET_AMT", nominalCols, binomialCols
+)))
+
+colnames(transformedData) %>%
+  .[! . %in% colnames(trainClean)]
+```
+
 # Model Building
 # Selecting Best Model
 # Conclusions and Suggestions
