@@ -1,6 +1,6 @@
 ---
 title: "Starter Workbench"
-author: "Anthony A"
+author: "Group 5"
 date: "`r format(Sys.time(), '%m/%d/%Y')`"
 output: 
   pdf_document:
@@ -10,7 +10,7 @@ output:
 ```{r setup, include=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 (function() { set.seed(8675309) })()
-# What functions are we pulling from these files? Strongly recommend we take this out. It is too complex.
+# What functions are we pulling from these files? 
 invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source))
 
 library(magrittr)
@@ -19,13 +19,17 @@ library(reshape2)
 library(dplyr)
 library(ggplot2)
 library(ggrepel)
+library(readr)
 
-rawData = LoadDataElseWeb("insurance_training_data.csv", "../data/")
+
+rawData = LoadDataElseWeb("insurance_training_data.csv", "../data/") 
 rawTestData = LoadDataElseWeb("insurance-evaluation-data.csv", "../data/")
 ```
 
 # Abstract
-# Data Exploration
+TK
+
+# Data Exploration & Preparation
 
 ```{r}
 head(rawData)
@@ -36,20 +40,25 @@ sapply(rawData, class)
 
 After carefully examining the data in the raw data frame, it was found that certain variables contained unnecessary characters such as dollar signs and garbage data. To address this issue, regular expression (regex) was used to remove these unwanted characters from the variables. By doing so, the data is now cleaner and more suitable for analysis.
 
-Additionally, there are several nominal categories that are yes and no questions. We reduced this to factors using regex again to further simplify the process.
+Additionally, there are several nominal categories that are yes and no questions. We reduced this to binary where 1=yes and2=no using regex again to further simplify the process.
+
+Finally, we convert variables to type factor or numeric, as appropriate.
 
 ```{r clean-funcs}
+#can you explain what this does with comments?
 SilentMutateAt <- function(df, dirtyCols = c("Sample", "Text"), FUN, ...) {
   ind = colnames(df) %in% dirtyCols
   df[, ind] = sapply(df[, ind], FUN = FUN, ... = ...)
   
-  df
+  return(df)
 }
 
+#can you explain what this does with comments?
 GsubPipe <- function(x, pattern, replacement, ...) {
   gsub(pattern, replacement, x, ...)
 }
 
+#This function replaces "yes/no" questions with a dummy variable structure where yes=1 and no=0
 CleanYesNo <- function(df, trace = FALSE, threshold = 0.5) {
   yesNoCols = sapply(df, function(x) { 
     unique(x) %>% 
@@ -78,76 +87,55 @@ CleanYesNo <- function(df, trace = FALSE, threshold = 0.5) {
 }
 
 CleanInsuranceStrings <- function(df) {
-  SilentMutateAt(df, colnames(df)[sapply(df, is.character)], GsubPipe, "\\$|z_|<|,", "") %>%
+  SilentMutateAt(df, colnames(df)[sapply(df, is.character)], GsubPipe, "\\$|z_|<|,", "") %>% 
     CleanYesNo(.) %>%
-      SilentMutateAt(c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM"), as.numeric) %>%
-        SilentMutateAt(., "JOB", function(x) { x[x == ""] = NA ; x })
-}
+    SilentMutateAt(c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM"), as.numeric) %>% #could also use readr::parse_number here
+    SilentMutateAt(., "JOB", function(x) { x[x == ""] = NA ; x }) %>% #what does this do?
+    unclass() %>%
+    as.data.frame(, stringsAsFactors=TRUE) #returns char as factor
+    }
 
-cleanData = CleanInsuranceStrings(rawData)
-rawData = CleanInsuranceStrings(rawData)
+#runs functions
+cleanData <- CleanInsuranceStrings(rawData) 
+TestData <- CleanInsuranceStrings(rawTestData)  
+        
+#reference: https://statisticsglobe.com/convert-character-to-factor-in-r
+
+#rawData = CleanInsuranceStrings(rawData) #so is this no longer raw then? we shouldn't reuse the term in that case
+summary(cleanData)
+head(cleanData)
 ```
 
 ## Missing values
-The rawData data frame contains 970 missing values, representing 948 our of 8161 observations.
+The rawData data frame contains 970 missing values, representing 948 out of 8161 observations. Most observations wiht
 ```{r}
 #nrow(rawData[is.na(rawData),]) #I don't understand this line, but this does not agree with the next chunk
 colSums(is.na(rawData)) %>% sum() #total missing values
 sum(!complete.cases(rawData)) #observations with missing data
 ```
 
-The following variables in the dataset have missing values: **TARGET_FLAG**, **TARGET_AMT**, **AGE**, **YOJ**, and **CAR_AGE**. It is important to address these missing values before proceeding with any analysis.
+The following variables in the dataset have missing values: **TARGET_FLAG**, **TARGET_AMT**, **AGE**, **YOJ**, and **CAR_AGE**. 
 
-A good rule of thumb is to drop any feature with more than 80% missing values -- that is not the case with any features here. 
-
-The remaining options are to:
+```{r}
+#this function adds up the rows with missing values to get a count of NAs by feature
+colSums(is.na(rawData)) 
+```
+A good rule of thumb is to drop any feature with more than 80% missing values -- that is not the case with any features here. The remaining options are to:
 1) Drop rows with missing values
 2) Infer missing values
 
-In order to decide which course to take we should first determine if there is any correlation between missing values, or if values are missing at random.
+In order to decide which course to take we should first determine if there is any correlation between features with missing values, or if values are missing at random. Because several of these features are numeric, we will first need to convert the features to the appropriate data type in order to determine if there is a correlation.
 ```{r}
-#this function adds up the rows with missing values to get a count of each
-##still to do -- see if there is any correlation between rows with missing data
-##good rule of thum
-colSums(is.na(rawData)) 
-```
-### AGE
-
-Based on the available data, it seems that YOJ tends to increase with age. There is one missing value in the AGE column, which has a corresponding YOJ value of 9. Given the available information, it is reasonable to predict that the missing age value is around 45. Insert the predicted values of AGE 45 into the original dataframe
-
-```{r}
-p <-  as.data.frame(9)
-colnames(p) <- "YOJ"
+# TO COME -- Section exploring correlation
 ```
 
-```{r}
-model1 <- lm(AGE ~ YOJ, data = rawData)
-predict(model1, newdata = p)
-```
+It is important to address these missing values before proceeding with any analysis.
 
-```{r}
-rawData$AGE <- ifelse(is.na(rawData$AGE), 45, rawData$AGE)
-```
 
-```{r}
-AGE_df <-rawData %>%
-  .[, ! sapply(., is.character) | colnames(.) == "SEX"] %>%
-    dplyr::filter(!is.na(YOJ)) %>%
-      dplyr::group_by(AGE, SEX) %>%
-        dplyr::select(-c('INDEX', 'TARGET_FLAG', 'TARGET_AMT')) %>%
-          dplyr::summarize_all(mean)
-AGE_df
-```
+### AGE & TARGET_FLAG
 
-```{r}
-AGE_df %>% 
-    ggplot(aes(x = AGE, y = YOJ, shape =SEX, colour = SEX)) + 
-       stat_smooth(se = TRUE, method = lm) +
-        geom_point(aes(x = AGE, y = YOJ, colour = SEX), size = 2.5) +
-            ggtitle("Total YOJ vs Age separated with Sex") +
-              theme_minimal()
+Based on the available data, it seems that YOJ tends to increase with age. There are 6 missing values in the AGE column, which is a trivial enough number that the simplest approach is to drop those observations. Observations that are missing the target cannot be used for training so those will also be dropped.
 
-```
 
 ### YOJ
 
@@ -246,7 +234,7 @@ ggplot(rawData, aes(x = SEX, y = INCOME, color = SEX, fill = SEX)) +
 
 ## Visulization of the data set
 
-Our features span a multitude of different distribtuions. Many of them are normal, others are binomial, and others are nominal. How we handle each feature will thus influence future analysis. 
+Our features span a multitude of different distributions. Many of them are normal, others are binomial, and others are nominal. How we handle each feature will thus influence future analysis. 
 
 ```{r}
 PlotVarDistribution(trainClean[, c(-1, -2, -3)], showBoxPlot = TRUE)
