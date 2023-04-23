@@ -265,6 +265,8 @@ colnames(transformedData) %>%
 
 # Model Building
 
+Of the models we build, we will build our first two models after an exhaustive outlier cleaning. It seems that both models favor managers for a lower insurance rate, interestingly enough. Additionally, the type of car has a significant impact on the amount. Also, both models agree that married couples are charged significantly lower rates, whereas this is even worse in the event that an unmarried person is also a single parent. Finally, both models agree that it is extremely significant whether the drivers are in urban or rural areas, such that urban drivers get charged around $1500 more than their rural counterparts.
+
 ```{r a-model1, eval=FALSE, warning=FALSE}
 .DataTransformsPipeline <- function(df, removeTargetCol = c("TARGET_FLAG", "TARGET_AMT")[1], nonLinearCols) {
   RemoveCols(df, removeTargetCol) %>%
@@ -280,6 +282,41 @@ colnames(transformedData) %>%
                 mice::mice(., method = "lasso.norm", printFlag = FALSE) %>%
                   mice::complete(.)
 }
+```
+
+```{r a-model2, eval=FALSE, warning=FALSE}
+lmMockup = .DataTransformsPipeline(
+  transformedData,
+  "TARGET_FLAG",
+  c("TARGET_FLAG", "TARGET_AMT", "OLDCLAIM", nominalCols, binomialCols)
+) %>%
+  RemoveCols("TARGET_FLAG") %>%
+    { do.call("lm", list(formula = TARGET_AMT ~ ., data = .)) }
+
+lmModel = MASS::stepAIC(lmMockup, direction = "both", trace = FALSE)
+funnyModel = lmModel
+
+saveRDS(funnyModel, paste0(here::here("data"), "/funnyModel.rds"))
+```
+
+```{r a-model3, eval=FALSE, warning=FALSE}
+lmMockupAlt = .DataTransformsPipeline(
+  cleanData,
+  "TARGET_FLAG",
+  c("TARGET_FLAG", "TARGET_AMT", "OLDCLAIM", nominalCols, binomialCols)
+) %>%
+  RemoveCols("TARGET_FLAG") %>%
+    { do.call("lm", list(formula = TARGET_AMT ~ ., data = .)) }
+
+lmModelAlt = MASS::stepAIC(lmMockupAlt, direction = "both", trace = FALSE)
+smallerModel = lmModelAlt
+
+saveRDS(smallerModel, paste0(here::here("data"), "/smallerModel.rds"))
+```
+
+```{r}
+funnyModel = readRDS(paste0(here::here("data"), "/funnyModel.rds"))
+smallerModel = readRDS(paste0(here::here("data"), "/smallerModel.rds"))
 ```
 
 # Selecting Best Model
