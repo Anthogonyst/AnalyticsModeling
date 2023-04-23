@@ -254,9 +254,10 @@ For our model, we will explore using power transforms on our model where feature
 ```{r}
 nominalCols = c("KIDSDRIV", "HOMEKIDS", "CLM_FREQ")
 binomialCols = c("PARENT1", "MSTATUS", "RED_CAR", "REVOKED")
-transformedData = cbind(trainClean, CrossProdFeatures(trainClean, dropCols = c(
+transformedData = cbind(cleanData, CrossProdFeatures(cleanData, dropCols = c(
   "INDEX", "TARGET_FLAG", "TARGET_AMT", nominalCols, binomialCols
-)))
+))) %>%
+  RemoveCols(., "INDEX")
 
 colnames(transformedData) %>%
   .[! . %in% colnames(trainClean)]
