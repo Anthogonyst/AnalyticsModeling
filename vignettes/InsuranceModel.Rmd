@@ -360,6 +360,24 @@ If the result is counter intuitive, it might be worthwhile to conduct another ex
 
 
 # Model Building
+
+```{r a-model1, eval=FALSE, warning=FALSE}
+.DataTransformsPipeline <- function(df, removeTargetCol = c("TARGET_FLAG", "TARGET_AMT")[1], nonLinearCols) {
+  RemoveCols(df, removeTargetCol) %>%
+    CoerceOutliersToNa(4) %>%
+      CoerceOutliersToNa(4) %>%
+        CoerceOutliersToNa(4) %>%
+          CoerceOutliersToNa(3) %>%
+            { dplyr::coalesce(
+              RemoveCols(transformedData, nonLinearCols, invert = T),
+              .
+            )} %>%
+              dplyr::select(colnames(df)) %>%
+                mice::mice(., method = "lasso.norm", printFlag = FALSE) %>%
+                  mice::complete(.)
+}
+```
+
 # Selecting Best Model
 # Conclusions and Suggestions
 # References
