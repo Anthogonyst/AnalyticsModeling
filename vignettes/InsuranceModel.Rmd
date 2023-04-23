@@ -323,6 +323,7 @@ The model's coefficient of 0.6015157 represents the correlation between the pred
 The model's coefficients for INCOME and HOME_VAL are negative, indicating that as these variables decrease, the predicted probability of a car insurance claim being filed (TARGET_FLAG) increases. This observation seems to contradict the expectation that individuals with higher incomes and more valuable homes would be safer drivers and thus less likely to file insurance claims.
 
 If the result is counter intuitive, it might be worthwhile to conduct another experiment to verify the accuracy of the outcome.
+
 # Model Building
 # Selecting Best Model
 # Conclusions and Suggestions
