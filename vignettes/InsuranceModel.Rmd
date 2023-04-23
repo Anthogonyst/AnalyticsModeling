@@ -80,7 +80,7 @@ CleanInsuranceStrings <- function(df) {
   SilentMutateAt(df, colnames(df)[sapply(df, is.character)], GsubPipe, "\\$|z_|<|,", "") %>%
     CleanYesNo(.) %>%
       SilentMutateAt(c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM"), as.numeric) %>%
-        SilentMutateAt(., "JOB", function(x) { x[x == ""] = NA ; x })
+        SilentMutateAt(., "JOB", function(x) { x[x == ""] = "Unspecified" ; x })
 }
 
 cleanData = CleanInsuranceStrings(rawData)
