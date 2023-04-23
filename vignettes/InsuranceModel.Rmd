@@ -10,6 +10,7 @@ output:
 ```{r setup, include=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 (function() { set.seed(8675309) })()
+# What functions are we pulling from these files? Strongly recommend we take this out. It is too complex.
 invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source))
 
 library(magrittr)
@@ -88,15 +89,27 @@ rawData = CleanInsuranceStrings(rawData)
 ```
 
 ## Missing values
-
-The rawData data frame contains 4506 missing values.
+The rawData data frame contains 970 missing values, representing 948 our of 8161 observations.
 ```{r}
-nrow(rawData[is.na(rawData),])
+#nrow(rawData[is.na(rawData),]) #I don't understand this line, but this does not agree with the next chunk
+colSums(is.na(rawData)) %>% sum() #total missing values
+sum(!complete.cases(rawData)) #observations with missing data
 ```
 
 The following variables in the dataset have missing values: **TARGET_FLAG**, **TARGET_AMT**, **AGE**, **YOJ**, and **CAR_AGE**. It is important to address these missing values before proceeding with any analysis.
+
+A good rule of thumb is to drop any feature with more than 80% missing values -- that is not the case with any features here. 
+
+The remaining options are to:
+1) Drop rows with missing values
+2) Infer missing values
+
+In order to decide which course to take we should first determine if there is any correlation between missing values, or if values are missing at random.
 ```{r}
-colSums(is.na(rawData))
+#this function adds up the rows with missing values to get a count of each
+##still to do -- see if there is any correlation between rows with missing data
+##good rule of thum
+colSums(is.na(rawData)) 
 ```
 ### AGE
 
