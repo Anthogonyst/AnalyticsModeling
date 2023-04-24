@@ -22,7 +22,7 @@ library(ggrepel)
 library(readr)
 
 
-rawData = LoadDataElseWeb("insurance_training_data.csv", "../data/") 
+rawData = read_csv("../data/insurance_training_data.csv") 
 rawTestData = LoadDataElseWeb("insurance-evaluation-data.csv", "../data/")
 ```
 
@@ -32,19 +32,19 @@ TK
 # Data Exploration & Preparation
 
 ```{r}
-head(rawData)
 sapply(rawData, class)
+head(rawData)
 ```
 
 ## Tidy Data
 
-After carefully examining the data in the raw data frame, it was found that certain variables contained unnecessary characters such as dollar signs and garbage data. To address this issue, regular expression (regex) was used to remove these unwanted characters from the variables. By doing so, the data is now cleaner and more suitable for analysis.
+After carefully examining the data in the raw data frame, it was found that certain variables contained unnecessary characters such as dollar signs. To address this issue, regular expression (regex) was used to remove these unwanted characters from the variables. By doing so, the data is now cleaner and more suitable for analysis.
 
-Additionally, there are several nominal categories that are yes and no questions. We reduced this to binary where 1=yes and2=no using regex again to further simplify the process.
+Additionally, there are several nominal categories that are yes and no questions. We reduced this to binary where 1=yes and 0=no using regex again to further simplify the process.
 
 Finally, we convert variables to type factor or numeric, as appropriate.
 
-```{r clean-funcs}
+```{r clean-func, eval=FALSE}
 #can you explain what this does with comments?
 SilentMutateAt <- function(df, dirtyCols = c("Sample", "Text"), FUN, ...) {
   ind = colnames(df) %in% dirtyCols
@@ -53,7 +53,7 @@ SilentMutateAt <- function(df, dirtyCols = c("Sample", "Text"), FUN, ...) {
   return(df)
 }
 
-#can you explain what this does with comments?
+#can you explain what this does with comments?is this different that just gsub?
 GsubPipe <- function(x, pattern, replacement, ...) {
   gsub(pattern, replacement, x, ...)
 }
@@ -106,6 +106,7 @@ summary(cleanData)
 head(cleanData)
 ```
 
+<<<<<<< Updated upstream
 ## Missing values
 The rawData data frame contains 970 missing values, representing 948 out of 8161 observations. Most observations wiht
 ```{r}
@@ -115,26 +116,140 @@ sum(!complete.cases(rawData)) #observations with missing data
 ```
 
 The following variables in the dataset have missing values: **TARGET_FLAG**, **TARGET_AMT**, **AGE**, **YOJ**, and **CAR_AGE**. 
+=======
+```{r clean-func2}
+## NOTE TO TEAM: we don't have to use this code, but here is another version that uses more built-in functions
+## I also see some advantages to leaving the binary values as factors so we don't predict impossible values
+
+# Define a list of columns formatted as currency
+hasDollars <- c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM") 
+
+# Parse the numeric data in those columns to remove excess characters, e.g. $, using readr::parse_numbers
+df <- rawData %>% mutate(across(hasDollars, readr::parse_number))
+
+
+# Next, classify characters as factors and relevel as appropriate
+df <- df %>% unclass () %>% as.data.frame(stringsAsFactors = TRUE) %>%
+  mutate(
+    TARGET_FLAG = as.factor(TARGET_FLAG),                         # Set target as factor
+    RED_CAR = forcats::fct_recode(RED_CAR,"Yes"="yes", "No"="no") # Clean up case
+  ) 
+
+## Define a function to remove "<" or any other non-alphanumeric prefix from levels
+remove_non_alphanum_prefix <- function(x) {
+  levels(x) <- gsub("^[^[:alnum:]]+",   # This removes any non alphanumeric character from the beginning of a factor level
+                    "",                 # and replaces it with an empty string
+                    levels(x))          # given a vector set as factor 
+  return(x)                             # and then returns the feature.        
+}
+
+## Define a function to remove "z_" or "Z_" prefix from levels
+
+remove_z_prefix <- function(x) {
+  levels(x) <- gsub("z_",               # This removes any "^z_" from the beginning of a factor level
+                    "",                 # and replaces it with an empty string
+                    levels(x),        
+                    ignore.case = TRUE  # ignoring case        
+                    ) 
+  return(x)                             # and then returns the feature.        
+}
+
+
+## Apply the functions to all columns of the data frame
+df <- as.data.frame(lapply(df, remove_non_alphanum_prefix))
+df <- as.data.frame(lapply(df, remove_z_prefix))
+
+# Summarize
+summary(df)
+
+# Rename data set as used elsewhere in the code
+cleanData <- df
+```
+
+## Missing values
+The rawData data frame contains 2405 missing values, representing 2116 out of 8161 observations. This is too many to simply drop all rows with missing data; however -- 'AGE' has only 6 missing variables so in that case the most straightforward approach is to drop those rows.
+>>>>>>> Stashed changes
 
 ```{r}
-#this function adds up the rows with missing values to get a count of NAs by feature
-colSums(is.na(rawData)) 
+print("Total missing values")
+colSums(is.na(cleanData)) %>% sum() #total missing values
+print("Observations with missing values")
+sum(!complete.cases(cleanData)) #observations with missing data
+("Number of missing values by feature")
+colSums(is.na(cleanData))
 ```
 A good rule of thumb is to drop any feature with more than 80% missing values -- that is not the case with any features here. The remaining options are to:
 1) Drop rows with missing values
 2) Infer missing values
 
+<<<<<<< Updated upstream
 In order to decide which course to take we should first determine if there is any correlation between features with missing values, or if values are missing at random. Because several of these features are numeric, we will first need to convert the features to the appropriate data type in order to determine if there is a correlation.
+=======
+The following variables in the data set have missing values: **AGE** (6), **YOJ** (454), **INCOME** (445), **HOME_VAL** (464) and **CAR_AGE**(510). 
+
+First, we will drop the missng **AGE** rows, then we will test each remaining variable for correlation with the other features in the data set to determin how best to handle.
+
+>>>>>>> Stashed changes
 ```{r}
-# TO COME -- Section exploring correlation
+df <- cleanData %>% tidyr::drop_na(AGE)
 ```
 
+<<<<<<< Updated upstream
 It is important to address these missing values before proceeding with any analysis.
+=======
+
+```{r, warning=FALSE}
+# Define list of columns to test
+cols <- c("YOJ", "HOME_VAL", "INCOME", "CAR_AGE")
+>>>>>>> Stashed changes
 
 
-### AGE & TARGET_FLAG
+# Define a function to test correlation with missingness and other features
+MAR_test <- function(df, cols) {
+  
+  # Define a function to relevel by missing values
+  relevel_missing <- function(x) {
+    for (i in 1:length(x)) {
+      x[i] <- dplyr::if_else(is.na(x[i]), 1, 0)
+      }
+    return(x)
+    }
 
-Based on the available data, it seems that YOJ tends to increase with age. There are 6 missing values in the AGE column, which is a trivial enough number that the simplest approach is to drop those observations. Observations that are missing the target cannot be used for training so those will also be dropped.
+
+  for (col in cols){
+    # Create a var to hold the releveled values
+    is_missing <- relevel_missing(subset(df, select=col)) %>% unlist()
+    print(class(is_missing))
+    
+    # p values we will fill in
+    p_vals <- rep(NA, ncol(df)) 
+
+    # Loop through every remaining column
+    for (j in 1:(ncol(df))) {
+	    s <- summary (glm(is_missing ~ df[, j], family = binomial))
+	    p_vals[j] <- s$coefficients[2,4]
+    }
+
+    results <- cbind(names(df), p_vals) %>% subset(p_vals < 0.05)
+    
+    print(col)
+    print(results)
+  }
+}
+
+
+
+MAR_test(df, cols)
+
+```
+
+All the remaining features with missing values have correlation with at least one other feautre, except **CAR_AGE**. **CAR_AGE** can be said to plausibly be missing completely at random, and so those rows can also be dropped without any expectation of affecting the model performane.
+
+```{r drop_missing_car_age}
+df <- cleanData %>% tidyr::drop_na(AGE, CAR_AGE)
+```
+The remaining features will require imputed values.
+
 
 
 ### YOJ
@@ -245,7 +360,7 @@ PlotVarDistribution(trainClean[, c(-1, -2, -3)], showBoxPlot = TRUE)
 According to this correlation matrix, all of the features are not strongly correlated to each other. With this in mind, we will go forward and assume that potentially every feature is a principal component and we will not exclude any until further downstream analysis is conducted.
 
 ```{r}
-PlotCorrEllipse(stats::cor(rawData[, sapply(trainClean, is.numeric)] %>% .[, c(-1, -2, -3)], use = "na.or.complete"))
+PlotCorrEllipse(stats::cor(cleanData[, sapply(cleanData, is.numeric)] %>% .[, c(-1, -2, -3)], use = "na.or.complete"))
 ```
 
 # Data Transformations
@@ -311,7 +426,12 @@ If the result is counter intuitive, it might be worthwhile to conduct another ex
 
 
 # Model Building
+
 # Selecting Best Model
+
 # Conclusions and Suggestions
+
 # References
+[Binary Classification] (https://seantrott.github.io/binary_classification_R/#the_logistic_model)
+[Testing for correlation with missing values] (https://campus.datacamp.com/courses/scalable-data-processing-in-r/case-study-a-preliminary-analysis-of-the-housing-data?ex=4)
 # Appendix
