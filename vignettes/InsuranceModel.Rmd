@@ -147,7 +147,10 @@ head(cleanData)
 Our features span a multitude of different distributions. Many of them are normal, others are binomial, and others are nominal. How we handle each feature will thus influence future analysis. 
 
 ```{r dist}
+### Plots the distribution of each variable
+# See common-helpers.R
 RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
+  # See common-stats.R
   PlotVarDistribution(showBoxPlot = TRUE)
 ```
 
@@ -156,9 +159,12 @@ RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
 According to this correlation matrix, all of the features are not strongly correlated to each other. With this in mind, we will go forward and assume that potentially every feature is a principal component and we will not exclude any until further downstream analysis is conducted.
 
 ```{r corr}
+### Develops a correlation plot for all numeric values
+# See common-helpers.R
 RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
   .[, sapply(., is.numeric)] %>%
     stats::cor(., use = "na.or.complete") %>%
+      # See common-stats.R
       PlotCorrEllipse(.)
 ```
 
@@ -306,6 +312,9 @@ For our model, we will explore using power transforms on our model where feature
 ```{r tf-prod}
 nominalCols = c("KIDSDRIV", "HOMEKIDS", "CLM_FREQ")
 binomialCols = c("PARENT1", "MSTATUS", "RED_CAR", "REVOKED")
+
+### Creates features that are products of numerical columns and binds to the original dataset
+# See common-helpers.R
 transformedData = cbind(trainClean, CrossProdFeatures(trainClean, dropCols = c(
   "INDEX", "TARGET_FLAG", "TARGET_AMT", nominalCols, binomialCols
 )))
