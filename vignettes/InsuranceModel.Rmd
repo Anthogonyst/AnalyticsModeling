@@ -333,9 +333,9 @@ To evaluate the performance of a machine learning model, it is important to spli
 library(MASS)
 
 set.seed(333)
-trainIndex <- sample(1:nrow(rawTrainData), round(0.7*nrow(rawTrainData)), replace = FALSE)
-trainData <- rawTrainData[trainIndex, ]
-testData <- rawTrainData[-trainIndex, ]
+trainIndex <- sample(1:nrow(trainClean), round(0.7*nrow(trainClean)), replace = FALSE)
+trainData <- trainClean[trainIndex, ]
+testData <- trainClean[-trainIndex, ]
 
 
 trainData <- na.omit(trainData)
