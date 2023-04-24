@@ -278,7 +278,7 @@ trainClean = imputeData
 ## Summary
 
 ```{r impute-summary}
-summary(select(imputeData, -INDEX))
+summary(dplyr::select(imputeData, -INDEX))
 ```
 
 ## Box-plot
