@@ -10,7 +10,6 @@ output:
 ```{r setup, include=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 (function() { set.seed(8675309) })()
-# What functions are we pulling from these files? 
 invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source))
 
 library(magrittr)
@@ -20,7 +19,6 @@ library(dplyr)
 library(ggplot2)
 library(ggrepel)
 library(readr)
-
 
 rawData = LoadDataElseWeb("insurance_training_data.csv", "../data/") 
 rawTestData = LoadDataElseWeb("insurance-evaluation-data.csv", "../data/")
@@ -45,7 +43,7 @@ Additionally, there are several nominal categories that are yes and no questions
 Finally, we convert variables to type factor or numeric, as appropriate.
 
 ```{r clean-funcs}
-#can you explain what this does with comments?
+### Akin to dplyr::mutate_at but does not throw error ("silent") on missing cols and applies a function
 SilentMutateAt <- function(df, dirtyCols = c("Sample", "Text"), FUN, ...) {
   ind = colnames(df) %in% dirtyCols
   df[, ind] = sapply(df[, ind], FUN = FUN, ... = ...)
@@ -53,12 +51,12 @@ SilentMutateAt <- function(df, dirtyCols = c("Sample", "Text"), FUN, ...) {
   return(df)
 }
 
-#can you explain what this does with comments?
+### Rearranges parameters of gsub to be more friendly to pipe operator
 GsubPipe <- function(x, pattern, replacement, ...) {
   gsub(pattern, replacement, x, ...)
 }
 
-#This function replaces "yes/no" questions with a dummy variable structure where yes=1 and no=0
+### Replaces "yes/no" questions with an integer where yes=1 and no=0
 CleanYesNo <- function(df, trace = FALSE, threshold = 0.5) {
   yesNoCols = sapply(df, function(x) { 
     unique(x) %>% 
@@ -86,19 +84,24 @@ CleanYesNo <- function(df, trace = FALSE, threshold = 0.5) {
   return(result)
 }
 
+### Pre-processing data pipeline for insurance data; cleans up strings
 CleanInsuranceStrings <- function(df) {
   SilentMutateAt(df, colnames(df)[sapply(df, is.character)], GsubPipe, "\\$|z_|<|,", "") %>% 
     CleanYesNo(.) %>%
-    SilentMutateAt(c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM"), as.numeric) %>% #could also use readr::parse_number here
-    SilentMutateAt(., "JOB", function(x) { x[x == ""] = NA ; x }) %>% #what does this do?
-    unclass() %>%
-    as.data.frame(, stringsAsFactors=TRUE) #returns char as factor
-    }
+      # could also use readr::parse_number here
+      SilentMutateAt(c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM"), as.numeric) %>% 
+        ### Coerces blank strings to NA
+        SilentMutateAt(., "JOB", function(x) { x[x == ""] = NA ; x }) %>%
+          ### Converts strings to factors
+          dplyr::mutate_at(., colnames(.)[sapply(., is.character)], as.factor)
+}
+```
 
+```{r init}
 #runs functions
-cleanData <- CleanInsuranceStrings(rawData) 
-TestData <- CleanInsuranceStrings(rawTestData)  
-        
+cleanData <- CleanInsuranceStrings(rawData)
+cleanTestData <- CleanInsuranceStrings(rawTestData)
+
 #reference: https://statisticsglobe.com/convert-character-to-factor-in-r
 
 #rawData = CleanInsuranceStrings(rawData) #so is this no longer raw then? we shouldn't reuse the term in that case
@@ -107,16 +110,24 @@ head(cleanData)
 ```
 
 ## Missing values
-The rawData data frame contains 970 missing values, representing 948 out of 8161 observations. Most observations wiht
-```{r}
-#nrow(rawData[is.na(rawData),]) #I don't understand this line, but this does not agree with the next chunk
-colSums(is.na(rawData)) %>% sum() #total missing values
+The rawData data frame contains `r sum(colSums(is.na(rawData)))`` missing values, representing `r sum(!complete.cases(rawData))` out of `r nrow(rawData)` observations. Most observations wiht
+
+```{r missing, eval=FALSE}
+### Counts values with missing data
+#I don't understand this line, but this does not agree with the next chunk
+# AA: i got the same result on my side but the other version is more clear
+#nrow(rawData[is.na(rawData),]) 
+
+### total missing values
+colSums(is.na(rawData)) %>% sum()
+
+### Counts rows with missing data
 sum(!complete.cases(rawData)) #observations with missing data
 ```
 
 The following variables in the dataset have missing values: **TARGET_FLAG**, **TARGET_AMT**, **AGE**, **YOJ**, and **CAR_AGE**. 
 
-```{r}
+```{r missing-cols}
 #this function adds up the rows with missing values to get a count of NAs by feature
 colSums(is.na(rawData)) 
 ```
@@ -125,6 +136,7 @@ A good rule of thumb is to drop any feature with more than 80% missing values --
 2) Infer missing values
 
 In order to decide which course to take we should first determine if there is any correlation between features with missing values, or if values are missing at random. Because several of these features are numeric, we will first need to convert the features to the appropriate data type in order to determine if there is a correlation.
+
 ```{r}
 # TO COME -- Section exploring correlation
 ```
@@ -140,7 +152,8 @@ Based on the available data, it seems that YOJ tends to increase with age. There
 ### YOJ
 
 Build the linear regression model with AGE as the predictor and YOJ as the response and predict the missing values of YOJ based on the values of AGE. Insert the predicted values of YOJ into the original dataframe.
-```{r}
+
+```{r impute-yoj}
 # Subset the data with missing values of YOJ
 missing_YOJ <- subset(rawData, is.na(YOJ))
 
@@ -157,7 +170,8 @@ rawData$YOJ[is.na(rawData$YOJ)] <- rounded_YOJ
 ### Income
 
 Build the linear regression model with AGE and YOJ as the predictors and INCOME as the response and predict the missing values of INCOME based on the values of AGE and YOJ. insert the predicted values of INCOME into the original dataframe.
-```{r}
+
+```{r impute-income}
 # Subset the data with missing values of INCOME
 missing_INCOME <- subset(rawData, is.na(INCOME))
 
@@ -173,7 +187,8 @@ rawData[is.na(rawData$INCOME),]$INCOME <- rounded_INCOME
 ### Home-val
 
 Build the linear regression model with AGE, YOJ, and INCOME as predictors and HOME_VAL as the response and predict the missing values of HOME_VAL based on the values of AGE, YOJ, and INCOME. Insert the predicted values of HOME_VAL into the original dataframe
-```{r}
+
+```{r impute-home}
 # Subset the data with missing values of HOME_VAL
 missing_HOME_VAL <- subset(rawData, is.na(HOME_VAL))
 
@@ -194,7 +209,7 @@ head(rawData$HOME_VAL)
 
 To handle the missing value in CAR_AGE, we will use chained imputation since it is difficult to assess. This will also fill any other data that is still missing so we now have produced our final cleaning steps. We may next consider doing manipulations such as normalization, zero centering, and other kinds of feature engineering.
 
-```{r}
+```{r impute-finish}
 rawData = rawData %>%
   mice::mice(., method = "pmm", printFlag = FALSE) %>%
     mice::complete(.)
@@ -203,14 +218,15 @@ trainClean = rawData
 
 ## Summary
 
-```{r}
+```{r impute-summary}
 summary(select(rawData, -INDEX))
 ```
 
 ## Box-plot
 
 We have 971 male and 1170 female in this study. Male average income is higher than man. However, man has highest car purchase amount. The boxplots show that the medians and interquartile range of the two distributions are very close.
-```{r}
+
+```{r sex-income}
 SEX_df <- rawData %>% 
   filter(!is.na(INCOME)) %>%
         group_by(SEX) %>% 
@@ -218,7 +234,7 @@ SEX_df <- rawData %>%
 SEX_df
 ```
 
-```{r}
+```{r plot-sex-income}
 ggplot(rawData, aes(x = SEX, y = INCOME, color = SEX, fill = SEX)) +
   geom_bar(data = SEX_df, stat = "identity", alpha = .3) + 
     ggrepel::geom_text_repel(aes(label = HOME_VAL), color = "black", size = 2.5, segment.color = "grey") +
@@ -252,7 +268,7 @@ PlotCorrEllipse(stats::cor(rawData[, sapply(trainClean, is.numeric)] %>% .[, c(-
 
 For our model, we will explore using power transforms on our model where features A and B can create a derived feature A*B. We have previously verified that there is very low colinearity in our data so this will be safe to use, although it will raise our computation effort.
 
-```{r}
+```{r tf-prod}
 nominalCols = c("KIDSDRIV", "HOMEKIDS", "CLM_FREQ")
 binomialCols = c("PARENT1", "MSTATUS", "RED_CAR", "REVOKED")
 transformedData = cbind(trainClean, CrossProdFeatures(trainClean, dropCols = c(
@@ -281,7 +297,7 @@ The final model contains the variables ARGET_AMT, HOMEKIDS, INCOME, HOME_VAL, BL
 
 To evaluate the performance of a machine learning model, it is important to split the data into training and test sets. The training set is used to train the model, while the test set is used to evaluate how well the model generalizes to new, unseen data.
 
-```{r}
+```{r seung-model}
 library(MASS)
 
 set.seed(333)
