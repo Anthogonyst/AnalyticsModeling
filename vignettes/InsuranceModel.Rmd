@@ -317,7 +317,8 @@ binomialCols = c("PARENT1", "MSTATUS", "RED_CAR", "REVOKED")
 # See common-helpers.R
 transformedData = cbind(trainClean, CrossProdFeatures(trainClean, dropCols = c(
   "INDEX", "TARGET_FLAG", "TARGET_AMT", nominalCols, binomialCols
-)))
+))) %>%
+  RemoveCols(., "INDEX")
 
 colnames(transformedData) %>%
   .[! . %in% colnames(trainClean)]
