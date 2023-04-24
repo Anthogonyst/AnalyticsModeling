@@ -29,9 +29,42 @@ TK
 
 # Data Exploration & Preparation
 
-```{r}
-head(rawData)
-sapply(rawData, class)
+The data has 23 features and 2 target variables that we wish to predict. As part of our predictive analytics, first we will decide if the car that belongs to a license plate has been in a crash before. Second, we will determine how much the cost of the crash was if they were.
+
+- TARGET_FLAG: Was Car in a crash? 1=YES 0=NO None
+- TARGET_AMT: If car was in a crash, what was the cost
+
+There are some general myths related to driving that may skew our view about what we expect. How much of it is true? Personally, I think that senior drivers get into more crashes than those younger but what if that's not the case? Provided below is a quick data dictionary of the features we will be measuring.
+
+- AGE: Age of Driver
+- BLUEBOOK: Value of Vehicle
+- CAR_AGE: Vehicle Age
+- CAR_TYPE: Type of Car
+- CAR_USE: Vehicle Use
+- CLM_FREQ: # Claims (Past 5 Years)
+- EDUCATION: Max Education Level
+- HOMEKIDS: # Children at Home
+- HOME_VAL: Home Value
+- INCOME: Income
+- JOB: Job Category
+- KIDSDRIV: # Driving Children
+- MSTATUS: Marital Status
+- MVR_PTS: Motor Vehicle Record Points
+- OLDCLAIM: Total Claims (Past 5 Years)
+- PARENT1: Single Parent
+- RED_CAR: A Red Car
+- REVOKED: License Revoked (Past 7 Years)
+- SEX: Gender
+- TIF: Time in Force
+- TRAVTIME: Distance to Work
+- URBANICITY: Home/Work Area
+- YOJ: Years on Job
+
+The top of the dataset is shown below, where we can see a smattering of isues such as untidy data and even a missing value in one of the income observations.
+
+```{r head-class}
+head(rawData, 4)
+#sapply(rawData, class)
 ```
 
 ## Tidy Data
