@@ -163,7 +163,7 @@ RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
 ```
 
 ## Missing values
-The rawData data frame contains `r sum(colSums(is.na(rawData)))`` missing values, representing `r sum(!complete.cases(rawData))` out of `r nrow(rawData)` observations. Most observations wiht
+The raw data frame contains `r sum(colSums(is.na(rawData)))`` missing values, representing `r sum(!complete.cases(rawData))` out of `r nrow(rawData)` observations.
 
 ```{r missing, eval=FALSE}
 ### Counts values with missing data
