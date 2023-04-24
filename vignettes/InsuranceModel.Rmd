@@ -124,7 +124,7 @@ CleanInsuranceStrings <- function(df) {
       # could also use readr::parse_number here
       SilentMutateAt(c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM"), as.numeric) %>% 
         ### Coerces blank strings to NA
-        SilentMutateAt(., "JOB", function(x) { x[x == ""] = NA ; x }) %>%
+        SilentMutateAt(., "JOB", function(x) { x[x == ""] = "Unspecified" ; x }) %>%
           ### Converts strings to factors
           dplyr::mutate_at(., colnames(.)[sapply(., is.character)], as.factor)
 }
