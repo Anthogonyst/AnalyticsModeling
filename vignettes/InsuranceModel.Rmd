@@ -106,17 +106,14 @@ summary(cleanData)
 head(cleanData)
 ```
 
-<<<<<<< Updated upstream
 ## Missing values
 The rawData data frame contains 970 missing values, representing 948 out of 8161 observations. Most observations wiht
 ```{r}
-#nrow(rawData[is.na(rawData),]) #I don't understand this line, but this does not agree with the next chunk
 colSums(is.na(rawData)) %>% sum() #total missing values
 sum(!complete.cases(rawData)) #observations with missing data
 ```
 
-The following variables in the dataset have missing values: **TARGET_FLAG**, **TARGET_AMT**, **AGE**, **YOJ**, and **CAR_AGE**. 
-=======
+
 ```{r clean-func2}
 ## NOTE TO TEAM: we don't have to use this code, but here is another version that uses more built-in functions
 ## I also see some advantages to leaving the binary values as factors so we don't predict impossible values
@@ -168,7 +165,6 @@ cleanData <- df
 
 ## Missing values
 The rawData data frame contains 2405 missing values, representing 2116 out of 8161 observations. This is too many to simply drop all rows with missing data; however -- 'AGE' has only 6 missing variables so in that case the most straightforward approach is to drop those rows.
->>>>>>> Stashed changes
 
 ```{r}
 print("Total missing values")
@@ -182,26 +178,22 @@ A good rule of thumb is to drop any feature with more than 80% missing values --
 1) Drop rows with missing values
 2) Infer missing values
 
-<<<<<<< Updated upstream
 In order to decide which course to take we should first determine if there is any correlation between features with missing values, or if values are missing at random. Because several of these features are numeric, we will first need to convert the features to the appropriate data type in order to determine if there is a correlation.
-=======
+
 The following variables in the data set have missing values: **AGE** (6), **YOJ** (454), **INCOME** (445), **HOME_VAL** (464) and **CAR_AGE**(510). 
 
 First, we will drop the missng **AGE** rows, then we will test each remaining variable for correlation with the other features in the data set to determin how best to handle.
 
->>>>>>> Stashed changes
+
 ```{r}
 df <- cleanData %>% tidyr::drop_na(AGE)
 ```
 
-<<<<<<< Updated upstream
-It is important to address these missing values before proceeding with any analysis.
-=======
+
 
 ```{r, warning=FALSE}
 # Define list of columns to test
 cols <- c("YOJ", "HOME_VAL", "INCOME", "CAR_AGE")
->>>>>>> Stashed changes
 
 
 # Define a function to test correlation with missingness and other features
@@ -251,7 +243,6 @@ df <- cleanData %>% tidyr::drop_na(AGE, CAR_AGE)
 The remaining features will require imputed values.
 
 
-
 ### YOJ
 
 Build the linear regression model with AGE as the predictor and YOJ as the response and predict the missing values of YOJ based on the values of AGE. Insert the predicted values of YOJ into the original dataframe.
@@ -271,7 +262,7 @@ rawData$YOJ[is.na(rawData$YOJ)] <- rounded_YOJ
 
 ### Income
 
-Build the linear regression model with AGE and YOJ as the predictors and INCOME as the response and predict the missing values of INCOME based on the values of AGE and YOJ. insert the predicted values of INCOME into the original dataframe.
+Build the linear regression model with AGE and YOJ [why?] as the predictors and INCOME as the response and predict the missing values of INCOME based on the values of AGE and YOJ. insert the predicted values of INCOME into the original dataframe.
 ```{r}
 # Subset the data with missing values of INCOME
 missing_INCOME <- subset(rawData, is.na(INCOME))
