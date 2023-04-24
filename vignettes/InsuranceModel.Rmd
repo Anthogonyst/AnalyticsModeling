@@ -420,6 +420,10 @@ saveRDS(smallerModel, paste0(here::here("data"), "/smallerModel.rds"))
 ```{r}
 funnyModel = readRDS(paste0(here::here("data"), "/funnyModel.rds"))
 smallerModel = readRDS(paste0(here::here("data"), "/smallerModel.rds"))
+
+### Subsets the model coefficients to those of pvalue below a value
+summary.lm(funnyModel)$coefficients %>%
+  .[.[,4] < .05, ]
 ```
 
 ## Alice's Models
