@@ -142,6 +142,26 @@ summary(cleanData)
 head(cleanData)
 ```
 
+## Visulization of the data set
+
+Our features span a multitude of different distributions. Many of them are normal, others are binomial, and others are nominal. How we handle each feature will thus influence future analysis. 
+
+```{r dist}
+RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
+  PlotVarDistribution(showBoxPlot = TRUE)
+```
+
+## Visualization of Correlation
+
+According to this correlation matrix, all of the features are not strongly correlated to each other. With this in mind, we will go forward and assume that potentially every feature is a principal component and we will not exclude any until further downstream analysis is conducted.
+
+```{r corr}
+RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
+  .[, sapply(., is.numeric)] %>%
+    stats::cor(., use = "na.or.complete") %>%
+      PlotCorrEllipse(.)
+```
+
 ## Missing values
 The rawData data frame contains `r sum(colSums(is.na(rawData)))`` missing values, representing `r sum(!complete.cases(rawData))` out of `r nrow(rawData)` observations. Most observations wiht
 
@@ -279,22 +299,6 @@ ggplot(rawData, aes(x = SEX, y = INCOME, color = SEX, fill = SEX)) +
           x = "Sex",
           y = "Income"
         )
-```
-
-## Visulization of the data set
-
-Our features span a multitude of different distributions. Many of them are normal, others are binomial, and others are nominal. How we handle each feature will thus influence future analysis. 
-
-```{r}
-PlotVarDistribution(trainClean[, c(-1, -2, -3)], showBoxPlot = TRUE)
-```
-
-## Visualization of Correlation
-
-According to this correlation matrix, all of the features are not strongly correlated to each other. With this in mind, we will go forward and assume that potentially every feature is a principal component and we will not exclude any until further downstream analysis is conducted.
-
-```{r}
-PlotCorrEllipse(stats::cor(rawData[, sapply(trainClean, is.numeric)] %>% .[, c(-1, -2, -3)], use = "na.or.complete"))
 ```
 
 # Data Transformations
