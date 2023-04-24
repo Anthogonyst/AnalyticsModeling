@@ -124,7 +124,7 @@ CleanInsuranceStrings <- function(df) {
       # could also use readr::parse_number here
       SilentMutateAt(c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM"), as.numeric) %>% 
         ### Coerces blank strings to NA
-        SilentMutateAt(., "JOB", function(x) { x[x == ""] = NA ; x }) %>%
+        SilentMutateAt(., "JOB", function(x) { x[x == ""] = "Unspecified" ; x }) %>%
           ### Converts strings to factors
           dplyr::mutate_at(., colnames(.)[sapply(., is.character)], as.factor)
 }
@@ -317,11 +317,18 @@ binomialCols = c("PARENT1", "MSTATUS", "RED_CAR", "REVOKED")
 # See common-helpers.R
 transformedData = cbind(trainClean, CrossProdFeatures(trainClean, dropCols = c(
   "INDEX", "TARGET_FLAG", "TARGET_AMT", nominalCols, binomialCols
-)))
+))) %>%
+  RemoveCols(., "INDEX")
 
 colnames(transformedData) %>%
   .[! . %in% colnames(trainClean)]
 ```
+
+# Model Building
+
+We will each create a model to explore and compare the differences between them. Additionally, we will discuss the key insights that we gain from the modeling process because it will help us draw conclusions about the dataset and potentially point us towards a preferred model.
+
+## Seung's Models
 
 Stepwise regression analysis was performed. The purpose of stepwise regression is to identify the subset of predictors that best explain the response variable. In this case, the response variables are TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, and CAR_AGE. The model selects the best subset of these predictors by iteratively adding or removing variables based on statistical criteria, in this case the Akaike Information Criterion (AIC).
 
@@ -351,6 +358,7 @@ predictions <- predict(model, testData)
 
 cor(predictions, testData$TARGET_FLAG)
 ```
+
 The model's coefficient of 0.6015157 represents the correlation between the predicted values and actual values of the target variable, which is the probability of a car insurance claim being filed (TARGET_FLAG). A value of 0.60 indicates a moderate positive correlation between the predicted and actual values.
 
 The model's coefficients for INCOME and HOME_VAL are negative, indicating that as these variables decrease, the predicted probability of a car insurance claim being filed (TARGET_FLAG) increases. This observation seems to contradict the expectation that individuals with higher incomes and more valuable homes would be safer drivers and thus less likely to file insurance claims.
@@ -358,7 +366,68 @@ The model's coefficients for INCOME and HOME_VAL are negative, indicating that a
 If the result is counter intuitive, it might be worthwhile to conduct another experiment to verify the accuracy of the outcome.
 
 
-# Model Building
+## Anthony's First Models
+
+Of the models we build, we will build our first two models after an exhaustive outlier cleaning. It seems that both models favor managers for a lower insurance rate, interestingly enough. Additionally, the type of car has a significant impact on the amount. Also, both models agree that married couples are charged significantly lower rates, whereas this is even worse in the event that an unmarried person is also a single parent. Finally, both models agree that it is extremely significant whether the drivers are in urban or rural areas, such that urban drivers get charged around $1500 more than their rural counterparts.
+
+```{r a-model1, eval=FALSE, warning=FALSE}
+.DataTransformsPipeline <- function(df, removeTargetCol = c("TARGET_FLAG", "TARGET_AMT")[1], nonLinearCols) {
+  RemoveCols(df, removeTargetCol) %>%
+    CoerceOutliersToNa(4) %>%
+      CoerceOutliersToNa(4) %>%
+        CoerceOutliersToNa(4) %>%
+          CoerceOutliersToNa(3) %>%
+            { dplyr::coalesce(
+              RemoveCols(transformedData, nonLinearCols, invert = T),
+              .
+            )} %>%
+              dplyr::select(colnames(df)) %>%
+                mice::mice(., method = "lasso.norm", printFlag = FALSE) %>%
+                  mice::complete(.)
+}
+```
+
+```{r a-model2, eval=FALSE, warning=FALSE}
+lmMockup = .DataTransformsPipeline(
+  transformedData,
+  "TARGET_FLAG",
+  c("TARGET_FLAG", "TARGET_AMT", "OLDCLAIM", nominalCols, binomialCols)
+) %>%
+  RemoveCols("TARGET_FLAG") %>%
+    { do.call("lm", list(formula = TARGET_AMT ~ ., data = .)) }
+
+lmModel = MASS::stepAIC(lmMockup, direction = "both", trace = FALSE)
+funnyModel = lmModel
+
+saveRDS(funnyModel, paste0(here::here("data"), "/funnyModel.rds"))
+```
+
+```{r a-model3, eval=FALSE, warning=FALSE}
+lmMockupAlt = .DataTransformsPipeline(
+  cleanData,
+  "TARGET_FLAG",
+  c("TARGET_FLAG", "TARGET_AMT", "OLDCLAIM", nominalCols, binomialCols)
+) %>%
+  RemoveCols("TARGET_FLAG") %>%
+    { do.call("lm", list(formula = TARGET_AMT ~ ., data = .)) }
+
+lmModelAlt = MASS::stepAIC(lmMockupAlt, direction = "both", trace = FALSE)
+smallerModel = lmModelAlt
+
+saveRDS(smallerModel, paste0(here::here("data"), "/smallerModel.rds"))
+```
+
+```{r}
+funnyModel = readRDS(paste0(here::here("data"), "/funnyModel.rds"))
+smallerModel = readRDS(paste0(here::here("data"), "/smallerModel.rds"))
+
+### Subsets the model coefficients to those of pvalue below a value
+summary.lm(funnyModel)$coefficients %>%
+  .[.[,4] < .05, ]
+```
+
+## Alice's Models
+
 # Selecting Best Model
 # Conclusions and Suggestions
 # References
