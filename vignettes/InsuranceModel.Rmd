@@ -134,13 +134,9 @@ CleanInsuranceStrings <- function(df) {
 #runs functions
 cleanData <- CleanInsuranceStrings(rawData)
 cleanTestData <- CleanInsuranceStrings(rawTestData)
+imputeData = CleanInsuranceStrings(rawData)
 
 #reference: https://statisticsglobe.com/convert-character-to-factor-in-r
-
-#so is this no longer raw then? we shouldn't reuse the term in that case
-# AA: i agree, but i didnt want to break someone else's downstream analysis; see impute steps below
-rawData = CleanInsuranceStrings(rawData)
-imputeData = CleanInsuranceStrings(rawData)
 
 summary(cleanData)
 head(cleanData)
@@ -212,14 +208,14 @@ Build the linear regression model with AGE as the predictor and YOJ as the respo
 
 ```{r impute-yoj}
 # Subset the data with missing values of YOJ
-missing_YOJ <- subset(rawData, is.na(YOJ))
+missing_YOJ <- subset(imputeData, is.na(YOJ))
 
-lm_model <- lm(YOJ ~ AGE, data = rawData)
+lm_model <- lm(YOJ ~ AGE, data = imputeData)
 
 predicted_YOJ <- predict(lm_model, newdata = missing_YOJ)
 
 rounded_YOJ <- round(predicted_YOJ, digits = 0)
-rawData$YOJ[is.na(rawData$YOJ)] <- rounded_YOJ
+imputeData$YOJ[is.na(imputeData$YOJ)] <- rounded_YOJ
 
 
 ```
@@ -230,14 +226,14 @@ Build the linear regression model with AGE and YOJ as the predictors and INCOME 
 
 ```{r impute-income}
 # Subset the data with missing values of INCOME
-missing_INCOME <- subset(rawData, is.na(INCOME))
+missing_INCOME <- subset(imputeData, is.na(INCOME))
 
-lm_model <- lm(INCOME ~ AGE + YOJ, data = rawData)
+lm_model <- lm(INCOME ~ AGE + YOJ, data = imputeData)
 
 predicted_INCOME <- predict(lm_model, newdata = missing_INCOME)
 
 rounded_INCOME <- round(predicted_INCOME, digits = 0)
-rawData[is.na(rawData$INCOME),]$INCOME <- rounded_INCOME
+imputeData[is.na(imputeData$INCOME),]$INCOME <- rounded_INCOME
 
 ```
 
@@ -247,19 +243,19 @@ Build the linear regression model with AGE, YOJ, and INCOME as predictors and HO
 
 ```{r impute-home}
 # Subset the data with missing values of HOME_VAL
-missing_HOME_VAL <- subset(rawData, is.na(HOME_VAL))
+missing_HOME_VAL <- subset(imputeData, is.na(HOME_VAL))
 
 
-lm_model <- lm(HOME_VAL ~ AGE + YOJ + INCOME, data = rawData)
+lm_model <- lm(HOME_VAL ~ AGE + YOJ + INCOME, data = imputeData)
 
 
 predicted_HOME_VAL <- predict(lm_model, newdata = missing_HOME_VAL)
 
 #rounded_HOME_VAL <- round(predicted_HOME_VAL, digits = 0)
-rawData[is.na(rawData$HOME_VAL),]$HOME_VAL <- predicted_HOME_VAL
-rawData$HOME_VAL <- round(rawData$HOME_VAL, digits = 0)
+imputeData[is.na(imputeData$HOME_VAL),]$HOME_VAL <- predicted_HOME_VAL
+imputeData$HOME_VAL <- round(imputeData$HOME_VAL, digits = 0)
 
-head(rawData$HOME_VAL)
+head(imputeData$HOME_VAL)
 ```
 
 ### Car Age
@@ -267,16 +263,16 @@ head(rawData$HOME_VAL)
 To handle the missing value in CAR_AGE, we will use chained imputation since it is difficult to assess. This will also fill any other data that is still missing so we now have produced our final cleaning steps. We may next consider doing manipulations such as normalization, zero centering, and other kinds of feature engineering.
 
 ```{r impute-finish}
-rawData = rawData %>%
+imputeData = imputeData %>%
   mice::mice(., method = "pmm", printFlag = FALSE) %>%
     mice::complete(.)
-trainClean = rawData
+trainClean = imputeData
 ```
 
 ## Summary
 
 ```{r impute-summary}
-summary(select(rawData, -INDEX))
+summary(select(imputeData, -INDEX))
 ```
 
 ## Box-plot
@@ -284,25 +280,23 @@ summary(select(rawData, -INDEX))
 We have 971 male and 1170 female in this study. Male average income is higher than man. However, man has highest car purchase amount. The boxplots show that the medians and interquartile range of the two distributions are very close.
 
 ```{r sex-income}
-SEX_df <- rawData %>% 
-  filter(!is.na(INCOME)) %>%
-        group_by(SEX) %>% 
-        summarise(INCOME = mean(INCOME))
+SEX_df <- imputeData %>%
+  dplyr::filter(!is.na(INCOME)) %>%
+    dplyr::group_by(SEX) %>%
+      dplyr::summarise(INCOME = mean(INCOME))
+
 SEX_df
 ```
 
 ```{r plot-sex-income}
-ggplot(rawData, aes(x = SEX, y = INCOME, color = SEX, fill = SEX)) +
-  geom_bar(data = SEX_df, stat = "identity", alpha = .3) + 
-    ggrepel::geom_text_repel(aes(label = HOME_VAL), color = "black", size = 2.5, segment.color = "grey") +
-      geom_point() +
-        guides(color = "none", fill = "none") +
-        theme_bw() +
-        labs(
-          title = "Income by Sex",
-          x = "Sex",
-          y = "Income"
-        )
+ggplot2::ggplot(imputeData) +
+  ggplot2::aes(x = SEX, y = INCOME, color = SEX, fill = SEX) +
+  ggplot2::geom_bar(data = SEX_df, stat = "identity", alpha = .3) +
+  ggrepel::geom_text_repel(ggplot2::aes(label = HOME_VAL), color = "black", size = 2.5, segment.color = "grey") +
+  ggplot2::geom_point() +
+  ggplot2::guides(color = "none", fill = "none") +
+  ggplot2::theme_bw() +
+  ggplot2::labs(title = "Income by Sex", x = "Sex", y = "Income")
 ```
 
 # Data Transformations
