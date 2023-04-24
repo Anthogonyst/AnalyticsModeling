@@ -319,18 +319,6 @@ transformedData = cbind(trainClean, CrossProdFeatures(trainClean, dropCols = c(
 colnames(transformedData) %>%
   .[! . %in% colnames(trainClean)]
 ```
-Remove dollar sign ($) from columns and change to numeric
-```{r}
-rawTrainData$INCOME <- gsub("\\$", "", rawTrainData$INCOME) # $ 기호 제거
-rawTrainData$HOME_VAL <- gsub("\\$", "", rawTrainData$HOME_VAL) # $ 기호 제거
-rawTrainData$BLUEBOOK <- gsub("\\$", "", rawTrainData$BLUEBOOK) # $ 기호 제거
-rawTrainData$OLDCLAIM <- gsub("\\$", "", rawTrainData$OLDCLAIM) # $ 기호 제거
-
-rawTrainData$INCOME <- as.numeric(rawTrainData$INCOME) # 숫자로 변환
-rawTrainData$HOME_VAL <- as.numeric(rawTrainData$HOME_VAL) # 숫자로 변환
-rawTrainData$BLUEBOOK <- as.numeric(rawTrainData$BLUEBOOK) # 숫자로 변환
-rawTrainData$OLDCLAIM <- as.numeric(rawTrainData$OLDCLAIM) # 숫자로 변환
-```
 
 Stepwise regression analysis was performed. The purpose of stepwise regression is to identify the subset of predictors that best explain the response variable. In this case, the response variables are TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, and CAR_AGE. The model selects the best subset of these predictors by iteratively adding or removing variables based on statistical criteria, in this case the Akaike Information Criterion (AIC).
 
