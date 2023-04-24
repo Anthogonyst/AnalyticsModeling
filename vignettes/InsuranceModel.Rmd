@@ -137,7 +137,11 @@ cleanTestData <- CleanInsuranceStrings(rawTestData)
 
 #reference: https://statisticsglobe.com/convert-character-to-factor-in-r
 
-#rawData = CleanInsuranceStrings(rawData) #so is this no longer raw then? we shouldn't reuse the term in that case
+#so is this no longer raw then? we shouldn't reuse the term in that case
+# AA: i agree, but i didnt want to break someone else's downstream analysis; see impute steps below
+rawData = CleanInsuranceStrings(rawData)
+imputeData = CleanInsuranceStrings(rawData)
+
 summary(cleanData)
 head(cleanData)
 ```
