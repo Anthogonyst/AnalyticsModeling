@@ -399,7 +399,7 @@ lmMockup = .DataTransformsPipeline(
 lmModel = MASS::stepAIC(lmMockup, direction = "both", trace = FALSE)
 funnyModel = lmModel
 
-saveRDS(funnyModel, paste0(here::here("data"), "/funnyModel.rds"))
+saveRDS(funnyModel, paste0(here::here("data/models"), "/funnyModel.rds"))
 ```
 
 ```{r a-model3, eval=FALSE, warning=FALSE}
@@ -414,12 +414,12 @@ lmMockupAlt = .DataTransformsPipeline(
 lmModelAlt = MASS::stepAIC(lmMockupAlt, direction = "both", trace = FALSE)
 smallerModel = lmModelAlt
 
-saveRDS(smallerModel, paste0(here::here("data"), "/smallerModel.rds"))
+saveRDS(smallerModel, paste0(here::here("data/models"), "/smallerModel.rds"))
 ```
 
 ```{r}
-funnyModel = readRDS(paste0(here::here("data"), "/funnyModel.rds"))
-smallerModel = readRDS(paste0(here::here("data"), "/smallerModel.rds"))
+funnyModel = readRDS(paste0(here::here("data/models"), "/funnyModel.rds"))
+smallerModel = readRDS(paste0(here::here("data/models"), "/smallerModel.rds"))
 
 ### Subsets the model coefficients to those of pvalue below a value
 summary.lm(funnyModel)$coefficients %>%
