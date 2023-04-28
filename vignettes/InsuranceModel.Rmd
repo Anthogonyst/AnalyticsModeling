@@ -333,7 +333,8 @@ We will each create a model to explore and compare the differences between them.
 
 Stepwise regression analysis was performed. The purpose of stepwise regression is to identify the subset of predictors that best explain the response variable. In this case, the response variables are TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, and CAR_AGE. The model selects the best subset of these predictors by iteratively adding or removing variables based on statistical criteria, in this case the Akaike Information Criterion (AIC).
 
-The final model contains the variables ARGET_AMT, HOMEKIDS, INCOME, HOME_VAL, BLUEBOOK, and CAR_AGE. This subset of variables yielded the lowest AIC value among all possible subsets of variables considered by the algorithm.
+The final model contains the variables YOJ, HOMEKIDS, TRAVTIME, OLDCLAIM, CAR_AGE, AGE, KIDSDRIVE, TIF, BLUEBOOK, HOME_VAL, MVR_PTS, CLM_FREQ, TARGET_AMT.
+This subset of variables yielded the lowest AIC value among all possible subsets of variables considered by the algorithm. 
 
 To evaluate the performance of a machine learning model, it is important to split the data into training and test sets. The training set is used to train the model, while the test set is used to evaluate how well the model generalizes to new, unseen data.
 
@@ -360,7 +361,7 @@ predictions <- predict(model, testData)
 cor(predictions, testData$TARGET_FLAG)
 ```
 
-The model's coefficient of 0.6015157 represents the correlation between the predicted values and actual values of the target variable, which is the probability of a car insurance claim being filed (TARGET_FLAG). A value of 0.60 indicates a moderate positive correlation between the predicted and actual values.
+The model's coefficient of 0.5860083 represents the correlation between the predicted values and actual values of the target variable, which is the probability of a car insurance claim being filed (TARGET_FLAG). A value of 0.60 indicates a moderate positive correlation between the predicted and actual values.
 
 The model's coefficients for INCOME and HOME_VAL are negative, indicating that as these variables decrease, the predicted probability of a car insurance claim being filed (TARGET_FLAG) increases. This observation seems to contradict the expectation that individuals with higher incomes and more valuable homes would be safer drivers and thus less likely to file insurance claims.
 
@@ -430,6 +431,44 @@ summary.lm(funnyModel)$coefficients %>%
 ## Alice's Models
 
 # Selecting Best Model
+# Seung-min
+The ultimate goal of the analysis is to predict the probability of a car insurance claim being filed (TARGET_FLAG) based on the variables presented. The models developed are tools for achieving this goal by learning patterns in the data that can be used to make predictions about new cases.
+
+Using the summary output of a linear regression model in R, the TARGET_FLAG and predicted_flag were compared, resulting in a matching rate of well above 80%.
+
+```{r echo=FALSE}
+TARGET_AMT <- 4.655e-05
+KIDSDRIV <- 0.04989
+AGE <- -1.864e-03
+HOMEKIDS <- 8.459e-03
+YOJ <- -1.877e-03
+HOME_VAL <- -2.831e-07
+TRAVTIME <- 4.843e-04
+BLUEBOOK <- -3.395e-06
+TIF <- -5.604e-03
+OLDCLAIM <- 1.024e-06
+CLM_FREQ <- 4.400e-02
+MVR_PTS <- 1.735e-02
+CAR_AGE <- -1.898e-03
+
+testData <- read.csv("C:/Users/SeungminSong/Downloads/621R/insurance_training_data.csv")
+predicted <- predict(lm(TARGET_FLAG ~ TARGET_AMT + KIDSDRIV + AGE + HOMEKIDS + YOJ + HOME_VAL + TRAVTIME + BLUEBOOK + TIF + OLDCLAIM + CLM_FREQ + MVR_PTS + CAR_AGE, data = testData), testData)
+
+testData <- na.omit(testData)
+
+testData$predicted_flag <- ifelse(predict(model, testData, type="response") > 0.5, 1, 0)
+
+head(testData[, c("TARGET_FLAG", "predicted_flag")], n=10)
+```
+
+```{r}
+testData$matching_rate <- ifelse(testData$TARGET_FLAG == testData$predicted_flag, 1, 0)
+matching_rate <- sum(testData$matching_rate) / nrow(testData) * 100
+cat("Matching rate:", matching_rate, "%")
+```
+
+
+
 # Conclusions and Suggestions
 # References
 # Appendix
