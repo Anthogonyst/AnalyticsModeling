@@ -1,6 +1,6 @@
 ---
-title: "Starter Workbench"
-author: "Group 5"
+title: "Insurance Quotes"
+author: "Anthony Arroyo, Seung min song, Alice A. Friedman"
 date: "`r format(Sys.time(), '%m/%d/%Y')`"
 output: 
   pdf_document:
