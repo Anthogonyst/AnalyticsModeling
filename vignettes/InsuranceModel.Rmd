@@ -333,7 +333,7 @@ We will each create a model to explore and compare the differences between them.
 
 Stepwise regression analysis was performed. The purpose of stepwise regression is to identify the subset of predictors that best explain the response variable. In this case, the response variables are TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, and CAR_AGE. The model selects the best subset of these predictors by iteratively adding or removing variables based on statistical criteria, in this case the Akaike Information Criterion (AIC).
 
-The final model contains the variables ARGET_AMT, HOMEKIDS, INCOME, HOME_VAL, BLUEBOOK, and CAR_AGE. This subset of variables yielded the lowest AIC value among all possible subsets of variables considered by the algorithm.
+The final model contains the variables TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ ,MVR_PTS, CAR_AGE. This subset of variables yielded the lowest AIC value among all possible subsets of variables considered by the algorithm.
 
 To evaluate the performance of a machine learning model, it is important to split the data into training and test sets. The training set is used to train the model, while the test set is used to evaluate how well the model generalizes to new, unseen data.
 
@@ -360,11 +360,23 @@ predictions <- predict(model, testData)
 cor(predictions, testData$TARGET_FLAG)
 ```
 
-The model's coefficient of 0.6015157 represents the correlation between the predicted values and actual values of the target variable, which is the probability of a car insurance claim being filed (TARGET_FLAG). A value of 0.60 indicates a moderate positive correlation between the predicted and actual values.
+The model's coefficient of 0.5860083 represents the correlation between the predicted values and actual values of the target variable, which is the probability of a car insurance claim being filed (TARGET_FLAG). A value of 0.60 indicates a moderate positive correlation between the predicted and actual values.
 
 The model's coefficients for INCOME and HOME_VAL are negative, indicating that as these variables decrease, the predicted probability of a car insurance claim being filed (TARGET_FLAG) increases. This observation seems to contradict the expectation that individuals with higher incomes and more valuable homes would be safer drivers and thus less likely to file insurance claims.
 
 If the result is counter intuitive, it might be worthwhile to conduct another experiment to verify the accuracy of the outcome.
+
+```{r}
+confint(model)
+```
+
+Multiple Regression Model
+```{r}
+fit=lm(TARGET_FLAG ~ TARGET_AMT + KIDSDRIV + AGE + HOMEKIDS + YOJ + INCOME + HOME_VAL + TRAVTIME + BLUEBOOK + TIF + OLDCLAIM + CLM_FREQ + MVR_PTS + CAR_AGE, data = trainData)
+par(mfrow=c(2,2))
+plot(fit)
+par(mfrow=c(1,1))
+```
 
 
 ## Anthony's First Models
