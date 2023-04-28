@@ -26,7 +26,8 @@ rawTestData = LoadDataElseWeb("insurance-evaluation-data.csv", "../data/")
 ```
 
 # Abstract
-TK
+
+We discuss the challenges from evaluating insurance data, asserting whether a car is involved in a crash and then how expensive the claim would be. Mainly, we discuss imputation but our end models are not able to effectively predict car crashes due to overfitting and high false positives. Our linear regression models pull some insights regarding the effects of marital status and others on claim costs.
 
 # Data Exploration & Preparation
 
@@ -418,7 +419,7 @@ smallerModel = lmModelAlt
 saveRDS(smallerModel, paste0(here::here("data/models"), "/smallerModel.rds"))
 ```
 
-```{r}
+```{r a-load-models}
 funnyModel = readRDS(paste0(here::here("data/models"), "/funnyModel.rds"))
 smallerModel = readRDS(paste0(here::here("data/models"), "/smallerModel.rds"))
 
@@ -427,9 +428,187 @@ summary.lm(funnyModel)$coefficients %>%
   .[.[,4] < .05, ]
 ```
 
-## Alice's Models
+
+## Additional Transforms
+
+Since we created our initial models, we decided that there are three additional transforms we want to add. We believe that having a claim is predictive of making a claim again, so we will have a boolean column for any number of claims. Additionally, we decided that the only two relevant job types are doctors and managers, based on the models. Therefore, we will also make two boolean columns for if they are a manager or doctor.
+
+```{r tf-ins}
+### Creates a factor column for Manager/Doctor jobs and no claim history, specific to insurance dataset
+InsuranceTransforms <- function(df) {
+  df %>%
+    dplyr::mutate(
+      IS_MANAGER = as.factor(as.integer(JOB %in% "Manager")),
+      IS_DOCTOR = as.factor(as.integer(JOB %in% "Doctor")),
+      NO_CLM_HIST = as.factor(as.integer(CLM_FREQ < 1))
+    ) %>%
+      dplyr::select(-JOB, -CLM_FREQ)
+}
+```
+
+## Further Notes
+
+Although new models were attempted with the new transforms and additional considerations, none of them successfully beat the existing model by a statistically significant margin. We compared each of the models using ANOVA and evaluated the LM models with MAE and RMSE, whereas the logistical models were compared using F1 and Accuracy metrics. Overall, we kept the previously accepted models due to the lack of advancement.
+
+```{r meh-model}
+### Shuffles a vector to allow random picking simulations (not used)
+Shuffle <- function(x) {
+  x[sample(seq_along(x))]
+}
+
+### A plug and play for the insurance dataset
+MoreFactors <- function(df, cols = c(nominalCols, binomialCols)) {
+  dplyr::mutate_at(df, cols, as.factor)
+}
+
+### Adds three factors columns
+threeAddedData = cleanData %>%
+  RemoveCols("INDEX") %>%
+    InsuranceTransforms(.) %>%
+      mice::mice(., method = "lasso.norm", printFlag = FALSE) %>%
+        mice::complete(.)
+
+### Converts many more columns into factors that weren't previously
+factorsData = cleanData %>%
+  RemoveCols("INDEX") %>%
+    InsuranceTransforms(.) %>%
+      MoreFactors(., c(nominalCols, binomialCols) %>% .[! . %in% "CLM_FREQ"]) %>%
+        mice::mice(., method = "lasso.norm", printFlag = FALSE) %>%
+          mice::complete(.)
+
+### Not my best work but my code quality degrades the closer the deadline is
+ModelInsurance <- function(df, seed = 8675309) {
+  set.seed(seed)
+
+  tts = rsample::initial_split(df, strata = TARGET_FLAG)
+  zdfTrain = rsample::training(tts)
+  zdfTest = rsample::testing(tts)
+
+  lmResults = zdfTrain %>%
+    RemoveCols("TARGET_FLAG") %>%
+      { do.call("lm", list(formula = TARGET_AMT ~ ., data = .)) }
+
+  logResults = zdfTrain %>%
+    RemoveCols("TARGET_AMT") %>%
+      { do.call("glm", list(formula = TARGET_FLAG ~ ., data = ., family = "binomial"))}
+
+  lmOptimized = MASS::stepAIC(lmResults, direction = "both", trace = FALSE)
+  logOptimized = MASS::stepAIC(logResults, direction = "both", trace = FALSE)
+
+  vr = zdfTest$TARGET_AMT
+  v1 = predict.lm(lmResults, zdfTest)
+  v2 = predict.lm(lmOptimized, zdfTest)
+
+  lmTbl = data.frame(
+    mae = c(ModelMetrics::mae(vr, v1), ModelMetrics::mae(vr, v2)),
+    rmse = c(ModelMetrics::rmse(vr, v1), ModelMetrics::rmse(vr, v2)),
+    rmsle = c(ModelMetrics::rmsle(vr, v1), ModelMetrics::rmsle(vr, v2)),
+    cor = c(cor(vr, v1), cor(vr, v2))
+  )
+  logTbl = suppressWarnings(CompareModelStats(zdfTest, "TARGET_FLAG", logResults, logOptimized))
+
+  list(list(lmResults, lmOptimized), list(logResults, logOptimized), list(lmTbl, logTbl))
+}
+
+clm = ModelInsurance(trainClean)
+lmModel = clm[[1]][[1]]
+logModel = clm[[2]][[1]]
+```
+
+```{r more-tests, eval=FALSE}
+# Not the best integration...
+zlm = ModelInsurance(threeAddedData)
+tlm = ModelInsurance(transformedData)
+ilm = ModelInsurance(imputeData)
+flm = ModelInsurance(factorsData)
+
+logTables = lapply(list(clm, zlm, tlm, ilm, flm), function(x) { x[[3]][[2]] }) %>%
+  do.call(rbind, .)
+
+lmTables = lapply(list(clm, zlm, tlm, ilm, flm), function(x) { x[[3]][[1]] }) %>%
+  do.call(rbind, .)
+```
+
+```{r test-excess, eval=FALSE}
+### No significant improvement
+olm = cleanData %>%
+  RemoveCols(., names(sapply(cleanData, is.factor) %>% .[.])) %>%
+    RemoveCols("KIDSDRIV") %>%
+      CoerceOutliersToNa(4) %>%
+        CoerceOutliersToNa(4) %>%
+          CoerceOutliersToNa(4) %>%
+            CoerceOutliersToNa(3) %>%
+              mice::mice(., method = "pmm", printFlag = FALSE) %>%
+                mice::complete(.) %>%
+                  cbind(., cleanData[, sapply(cleanData, is.factor)], cleanData["KIDSDRIV"]) %>%
+                    InsuranceTransforms(.) %>%
+                      dplyr::select((colnames(cleanData) %>% .[! . %in% c("JOB", "CLM_FREQ")]), dplyr::everything()) %>%
+                        RemoveCols(c("INDEX", "JOB")) %>%
+                          mice::mice(., method = "lasso.norm", printFlag = FALSE) %>%
+                            mice::complete(.) %>%
+                              ModelInsurance(.)
+```
+
+```{r lm-assist, eval=FALSE}
+# An experiment to see if RMSE is reduced if we exclude non-claims cases
+# Note, this only worsened the results: MAE += 600; RMSE += 1800
+
+### Filters claims cases only, except 1 non-claim case
+Crash <- function(df) {
+  rbind(df[df$TARGET_FLAG == 1, ], df[(df$TARGET_FLAG == 0)[1], ])
+}
+
+clmCrash = ModelInsurance(Crash(trainClean))
+zlmCrash = ModelInsurance(Crash(threeAddedData))
+tlmCrash = ModelInsurance(Crash(transformedData))
+ilmCrash = ModelInsurance(Crash(imputeData))
+flmCrash = ModelInsurance(Crash(factorsData))
+
+logCrashTables = lapply(list(clmCrash, zlmCrash, tlmCrash, ilmCrash, flmCrash), function(x) { x[[3]][[2]] }) %>%
+  do.call(rbind, .)
+
+lmCrashTables = lapply(list(clmCrash, zlmCrash, tlmCrash, ilmCrash, flmCrash), function(x) { x[[3]][[1]] }) %>%
+  do.call(rbind, .)
+
+logCrashTables
+lmCrashTables
+```
 
 # Selecting Best Model
+
+```{r}
+testClean = CleanInsuranceStrings(rawTestData) %>%
+  mice::mice(., method = "pmm", printFlag = FALSE) %>%
+    mice::complete(.)
+
+results = data.frame(
+  INDEX = testClean$INDEX,
+  TARGET_FLAG = ifelse(predict(logModel, testClean) <= 0.5, 0L, 1L),
+  TARGET_AMT = predict(lmModel, testClean)
+) %>%
+  dplyr::mutate(TARGET_AMT = round(TARGET_AMT * TARGET_FLAG, 2)) %>%
+    write.csv(paste0(here::here("docs"), "/insurance-quotes-", substring(Sys.time(), 1, 10), ".csv"), row.names = FALSE)
+```
+
 # Conclusions and Suggestions
+
+Overall, none of our models really seemed to have the desired correlation that we were looking for. The one model that Seung made predicts well on the condition that the regression model can correctly predict claim amount. But since we don't have such a pristine model available, both models perform poorly. Perhaps we need to look into more data engineering techniques to better normalize our data. We spent an excessive amount of time doing imputations and statistical testing but it was overall ineffective to producing results.
+
 # References
+
+Data is provided by CUNY School of Professional Studies and is thus sourced by open data initiatives.
+
 # Appendix
+
+```{r, echo=TRUE, class.output="foldable"}
+CleanInsuranceStrings
+```
+
+```{r, echo=TRUE, class.output="foldable"}
+InsuranceTransforms
+```
+
+```{r, echo=TRUE, class.output="foldable"}
+ModelInsurance
+```
+
