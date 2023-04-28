@@ -18,6 +18,7 @@ library(reshape2)
 library(dplyr)
 library(ggplot2)
 library(ggrepel)
+library(ModelMetrics)
 library(readr)
 
 rawData = LoadDataElseWeb("insurance_training_data.csv", "../data/") 
