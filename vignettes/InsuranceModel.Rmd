@@ -1,6 +1,6 @@
 ---
-title: "Starter Workbench"
-author: "Group 5"
+title: "Insurance Quotes"
+author: "Anthony Arroyo, Seung min song, Alice A. Friedman"
 date: "`r format(Sys.time(), '%m/%d/%Y')`"
 output: 
   pdf_document:
@@ -10,7 +10,6 @@ output:
 ```{r setup, include=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 (function() { set.seed(8675309) })()
-# What functions are we pulling from these files? 
 invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source))
 
 library(magrittr)
@@ -19,10 +18,10 @@ library(reshape2)
 library(dplyr)
 library(ggplot2)
 library(ggrepel)
+library(ModelMetrics)
 library(readr)
 
-
-rawData = read_csv("../data/insurance_training_data.csv") 
+rawData = LoadDataElseWeb("insurance_training_data.csv", "../data/") 
 rawTestData = LoadDataElseWeb("insurance-evaluation-data.csv", "../data/")
 ```
 
@@ -31,9 +30,42 @@ TK
 
 # Data Exploration & Preparation
 
-```{r}
-sapply(rawData, class)
-head(rawData)
+The data has 23 features and 2 target variables that we wish to predict. As part of our predictive analytics, first we will decide if the car that belongs to a license plate has been in a crash before. Second, we will determine how much the cost of the crash was if they were.
+
+- TARGET_FLAG: Was Car in a crash? 1=YES 0=NO None
+- TARGET_AMT: If car was in a crash, what was the cost
+
+There are some general myths related to driving that may skew our view about what we expect. How much of it is true? Personally, I think that senior drivers get into more crashes than those younger but what if that's not the case? Provided below is a quick data dictionary of the features we will be measuring.
+
+- AGE: Age of Driver
+- BLUEBOOK: Value of Vehicle
+- CAR_AGE: Vehicle Age
+- CAR_TYPE: Type of Car
+- CAR_USE: Vehicle Use
+- CLM_FREQ: # Claims (Past 5 Years)
+- EDUCATION: Max Education Level
+- HOMEKIDS: # Children at Home
+- HOME_VAL: Home Value
+- INCOME: Income
+- JOB: Job Category
+- KIDSDRIV: # Driving Children
+- MSTATUS: Marital Status
+- MVR_PTS: Motor Vehicle Record Points
+- OLDCLAIM: Total Claims (Past 5 Years)
+- PARENT1: Single Parent
+- RED_CAR: A Red Car
+- REVOKED: License Revoked (Past 7 Years)
+- SEX: Gender
+- TIF: Time in Force
+- TRAVTIME: Distance to Work
+- URBANICITY: Home/Work Area
+- YOJ: Years on Job
+
+The top of the dataset is shown below, where we can see a smattering of isues such as untidy data and even a missing value in one of the income observations.
+
+```{r head-class}
+head(rawData, 4)
+#sapply(rawData, class)
 ```
 
 ## Tidy Data
@@ -44,8 +76,8 @@ Additionally, there are several nominal categories that are yes and no questions
 
 Finally, we convert variables to type factor or numeric, as appropriate.
 
-```{r clean-func, eval=FALSE}
-#can you explain what this does with comments?
+```{r clean-funcs}
+### Akin to dplyr::mutate_at but does not throw error ("silent") on missing cols and applies a function
 SilentMutateAt <- function(df, dirtyCols = c("Sample", "Text"), FUN, ...) {
   ind = colnames(df) %in% dirtyCols
   df[, ind] = sapply(df[, ind], FUN = FUN, ... = ...)
@@ -53,12 +85,12 @@ SilentMutateAt <- function(df, dirtyCols = c("Sample", "Text"), FUN, ...) {
   return(df)
 }
 
-#can you explain what this does with comments?is this different that just gsub?
+### Rearranges parameters of gsub to be more friendly to pipe operator
 GsubPipe <- function(x, pattern, replacement, ...) {
   gsub(pattern, replacement, x, ...)
 }
 
-#This function replaces "yes/no" questions with a dummy variable structure where yes=1 and no=0
+### Replaces "yes/no" questions with an integer where yes=1 and no=0
 CleanYesNo <- function(df, trace = FALSE, threshold = 0.5) {
   yesNoCols = sapply(df, function(x) { 
     unique(x) %>% 
@@ -86,35 +118,76 @@ CleanYesNo <- function(df, trace = FALSE, threshold = 0.5) {
   return(result)
 }
 
+### Pre-processing data pipeline for insurance data; cleans up strings
 CleanInsuranceStrings <- function(df) {
   SilentMutateAt(df, colnames(df)[sapply(df, is.character)], GsubPipe, "\\$|z_|<|,", "") %>% 
     CleanYesNo(.) %>%
-    SilentMutateAt(c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM"), as.numeric) %>% #could also use readr::parse_number here
-    SilentMutateAt(., "JOB", function(x) { x[x == ""] = NA ; x }) %>% #what does this do?
-    unclass() %>%
-    as.data.frame(, stringsAsFactors=TRUE) #returns char as factor
-    }
+      # could also use readr::parse_number here
+      SilentMutateAt(c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM"), as.numeric) %>% 
+        ### Coerces blank strings to NA
+        SilentMutateAt(., "JOB", function(x) { x[x == ""] = "Unspecified" ; x }) %>%
+          ### Converts strings to factors
+          dplyr::mutate_at(., colnames(.)[sapply(., is.character)], as.factor)
+}
+```
 
+```{r init}
 #runs functions
-cleanData <- CleanInsuranceStrings(rawData) 
-TestData <- CleanInsuranceStrings(rawTestData)  
-        
+cleanData <- CleanInsuranceStrings(rawData)
+cleanTestData <- CleanInsuranceStrings(rawTestData)
+imputeData = CleanInsuranceStrings(rawData)
+
 #reference: https://statisticsglobe.com/convert-character-to-factor-in-r
 
-#rawData = CleanInsuranceStrings(rawData) #so is this no longer raw then? we shouldn't reuse the term in that case
 summary(cleanData)
 head(cleanData)
+```
+
+## Visulization of the data set
+
+Our features span a multitude of different distributions. Many of them are normal, others are binomial, and others are nominal. How we handle each feature will thus influence future analysis. 
+
+```{r dist}
+### Plots the distribution of each variable
+# See common-helpers.R
+RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
+  # See common-stats.R
+  PlotVarDistribution(showBoxPlot = TRUE)
+```
+
+## Visualization of Correlation
+
+According to this correlation matrix, all of the features are not strongly correlated to each other. With this in mind, we will go forward and assume that potentially every feature is a principal component and we will not exclude any until further downstream analysis is conducted.
+
+```{r corr}
+### Develops a correlation plot for all numeric values
+# See common-helpers.R
+RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
+  .[, sapply(., is.numeric)] %>%
+    stats::cor(., use = "na.or.complete") %>%
+      # See common-stats.R
+      PlotCorrEllipse(.)
 ```
 
 ## Missing values
 The rawData data frame contains 970 missing values, representing 948 out of 8161 observations. Most observations wiht
 ```{r}
 colSums(is.na(rawData)) %>% sum() #total missing values
+The raw data frame contains `r sum(colSums(is.na(rawData)))`` missing values, representing `r sum(!complete.cases(rawData))` out of `r nrow(rawData)` observations.
+
+```{r missing, eval=FALSE}
+### Counts values with missing data
+#nrow(rawData[is.na(rawData),]) 
+
+### total missing values
+colSums(is.na(rawData)) %>% sum()
+
+### Counts rows with missing data
 sum(!complete.cases(rawData)) #observations with missing data
 ```
 
 
-```{r clean-func2}
+```{r clean-func2, eval=FALSE},
 ## NOTE TO TEAM: we don't have to use this code, but here is another version that uses more built-in functions
 ## I also see some advantages to leaving the binary values as factors so we don't predict impossible values
 
@@ -166,7 +239,7 @@ cleanData <- df
 ## Missing values
 The rawData data frame contains 2405 missing values, representing 2116 out of 8161 observations. This is too many to simply drop all rows with missing data; however -- 'AGE' has only 6 missing variables so in that case the most straightforward approach is to drop those rows.
 
-```{r}
+```{r missing-cols}
 print("Total missing values")
 colSums(is.na(cleanData)) %>% sum() #total missing values
 print("Observations with missing values")
@@ -246,140 +319,124 @@ The remaining features will require imputed values.
 ### YOJ
 
 Build the linear regression model with AGE as the predictor and YOJ as the response and predict the missing values of YOJ based on the values of AGE. Insert the predicted values of YOJ into the original dataframe.
-```{r}
-# Subset the data with missing values of YOJ
-missing_YOJ <- subset(rawData, is.na(YOJ))
 
-lm_model <- lm(YOJ ~ AGE, data = rawData)
+```{r impute-yoj}
+# Subset the data with missing values of YOJ
+missing_YOJ <- subset(imputeData, is.na(YOJ))
+
+lm_model <- lm(YOJ ~ AGE, data = imputeData)
 
 predicted_YOJ <- predict(lm_model, newdata = missing_YOJ)
 
 rounded_YOJ <- round(predicted_YOJ, digits = 0)
-rawData$YOJ[is.na(rawData$YOJ)] <- rounded_YOJ
+imputeData$YOJ[is.na(imputeData$YOJ)] <- rounded_YOJ
 
 
 ```
 
 ### Income
 
-Build the linear regression model with AGE and YOJ [why?] as the predictors and INCOME as the response and predict the missing values of INCOME based on the values of AGE and YOJ. insert the predicted values of INCOME into the original dataframe.
-```{r}
-# Subset the data with missing values of INCOME
-missing_INCOME <- subset(rawData, is.na(INCOME))
+Build the linear regression model with AGE and YOJ as the predictors and INCOME as the response and predict the missing values of INCOME based on the values of AGE and YOJ. insert the predicted values of INCOME into the original dataframe.
 
-lm_model <- lm(INCOME ~ AGE + YOJ, data = rawData)
+```{r impute-income}
+# Subset the data with missing values of INCOME
+missing_INCOME <- subset(imputeData, is.na(INCOME))
+
+lm_model <- lm(INCOME ~ AGE + YOJ, data = imputeData)
 
 predicted_INCOME <- predict(lm_model, newdata = missing_INCOME)
 
 rounded_INCOME <- round(predicted_INCOME, digits = 0)
-rawData[is.na(rawData$INCOME),]$INCOME <- rounded_INCOME
+imputeData[is.na(imputeData$INCOME),]$INCOME <- rounded_INCOME
 
 ```
 
 ### Home-val
 
 Build the linear regression model with AGE, YOJ, and INCOME as predictors and HOME_VAL as the response and predict the missing values of HOME_VAL based on the values of AGE, YOJ, and INCOME. Insert the predicted values of HOME_VAL into the original dataframe
-```{r}
+
+```{r impute-home}
 # Subset the data with missing values of HOME_VAL
-missing_HOME_VAL <- subset(rawData, is.na(HOME_VAL))
+missing_HOME_VAL <- subset(imputeData, is.na(HOME_VAL))
 
 
-lm_model <- lm(HOME_VAL ~ AGE + YOJ + INCOME, data = rawData)
+lm_model <- lm(HOME_VAL ~ AGE + YOJ + INCOME, data = imputeData)
 
 
 predicted_HOME_VAL <- predict(lm_model, newdata = missing_HOME_VAL)
 
 #rounded_HOME_VAL <- round(predicted_HOME_VAL, digits = 0)
-rawData[is.na(rawData$HOME_VAL),]$HOME_VAL <- predicted_HOME_VAL
-rawData$HOME_VAL <- round(rawData$HOME_VAL, digits = 0)
+imputeData[is.na(imputeData$HOME_VAL),]$HOME_VAL <- predicted_HOME_VAL
+imputeData$HOME_VAL <- round(imputeData$HOME_VAL, digits = 0)
 
-head(rawData$HOME_VAL)
+head(imputeData$HOME_VAL)
 ```
 
 ### Car Age
 
 To handle the missing value in CAR_AGE, we will use chained imputation since it is difficult to assess. This will also fill any other data that is still missing so we now have produced our final cleaning steps. We may next consider doing manipulations such as normalization, zero centering, and other kinds of feature engineering.
 
-```{r}
-rawData = rawData %>%
+```{r impute-finish}
+imputeData = imputeData %>%
   mice::mice(., method = "pmm", printFlag = FALSE) %>%
     mice::complete(.)
-trainClean = rawData
+trainClean = imputeData
 ```
 
 ## Summary
 
-```{r}
-summary(select(rawData, -INDEX))
+```{r impute-summary}
+summary(dplyr::select(imputeData, -INDEX))
 ```
 
 ## Box-plot
 
 We have 971 male and 1170 female in this study. Male average income is higher than man. However, man has highest car purchase amount. The boxplots show that the medians and interquartile range of the two distributions are very close.
-```{r}
-SEX_df <- rawData %>% 
-  filter(!is.na(INCOME)) %>%
-        group_by(SEX) %>% 
-        summarise(INCOME = mean(INCOME))
+
+```{r sex-income}
+SEX_df <- imputeData %>%
+  dplyr::filter(!is.na(INCOME)) %>%
+    dplyr::group_by(SEX) %>%
+      dplyr::summarise(INCOME = mean(INCOME))
+
 SEX_df
 ```
 
-```{r}
-ggplot(rawData, aes(x = SEX, y = INCOME, color = SEX, fill = SEX)) +
-  geom_bar(data = SEX_df, stat = "identity", alpha = .3) + 
-    ggrepel::geom_text_repel(aes(label = HOME_VAL), color = "black", size = 2.5, segment.color = "grey") +
-      geom_point() +
-        guides(color = "none", fill = "none") +
-        theme_bw() +
-        labs(
-          title = "Income by Sex",
-          x = "Sex",
-          y = "Income"
-        )
-```
-
-## Visulization of the data set
-
-Our features span a multitude of different distributions. Many of them are normal, others are binomial, and others are nominal. How we handle each feature will thus influence future analysis. 
-
-```{r}
-PlotVarDistribution(trainClean[, c(-1, -2, -3)], showBoxPlot = TRUE)
-```
-
-## Visualization of Correlation
-
-According to this correlation matrix, all of the features are not strongly correlated to each other. With this in mind, we will go forward and assume that potentially every feature is a principal component and we will not exclude any until further downstream analysis is conducted.
-
-```{r}
-PlotCorrEllipse(stats::cor(cleanData[, sapply(cleanData, is.numeric)] %>% .[, c(-1, -2, -3)], use = "na.or.complete"))
+```{r plot-sex-income}
+ggplot2::ggplot(imputeData) +
+  ggplot2::aes(x = SEX, y = INCOME, color = SEX, fill = SEX) +
+  ggplot2::geom_bar(data = SEX_df, stat = "identity", alpha = .3) +
+  ggrepel::geom_text_repel(ggplot2::aes(label = HOME_VAL), color = "black", size = 2.5, segment.color = "grey") +
+  ggplot2::geom_point() +
+  ggplot2::guides(color = "none", fill = "none") +
+  ggplot2::theme_bw() +
+  ggplot2::labs(title = "Income by Sex", x = "Sex", y = "Income")
 ```
 
 # Data Transformations
 
 For our model, we will explore using power transforms on our model where features A and B can create a derived feature A*B. We have previously verified that there is very low colinearity in our data so this will be safe to use, although it will raise our computation effort.
 
-```{r}
+```{r tf-prod}
 nominalCols = c("KIDSDRIV", "HOMEKIDS", "CLM_FREQ")
 binomialCols = c("PARENT1", "MSTATUS", "RED_CAR", "REVOKED")
+
+### Creates features that are products of numerical columns and binds to the original dataset
+# See common-helpers.R
 transformedData = cbind(trainClean, CrossProdFeatures(trainClean, dropCols = c(
   "INDEX", "TARGET_FLAG", "TARGET_AMT", nominalCols, binomialCols
-)))
+))) %>%
+  RemoveCols(., "INDEX")
 
 colnames(transformedData) %>%
   .[! . %in% colnames(trainClean)]
 ```
-Remove dollar sign ($) from columns and change to numeric
-```{r}
-rawTrainData$INCOME <- gsub("\\$", "", rawTrainData$INCOME) # $ 기호 제거
-rawTrainData$HOME_VAL <- gsub("\\$", "", rawTrainData$HOME_VAL) # $ 기호 제거
-rawTrainData$BLUEBOOK <- gsub("\\$", "", rawTrainData$BLUEBOOK) # $ 기호 제거
-rawTrainData$OLDCLAIM <- gsub("\\$", "", rawTrainData$OLDCLAIM) # $ 기호 제거
 
-rawTrainData$INCOME <- as.numeric(rawTrainData$INCOME) # 숫자로 변환
-rawTrainData$HOME_VAL <- as.numeric(rawTrainData$HOME_VAL) # 숫자로 변환
-rawTrainData$BLUEBOOK <- as.numeric(rawTrainData$BLUEBOOK) # 숫자로 변환
-rawTrainData$OLDCLAIM <- as.numeric(rawTrainData$OLDCLAIM) # 숫자로 변환
-```
+# Model Building
+
+We will each create a model to explore and compare the differences between them. Additionally, we will discuss the key insights that we gain from the modeling process because it will help us draw conclusions about the dataset and potentially point us towards a preferred model.
+
+## Seung's Models
 
 Stepwise regression analysis was performed. The purpose of stepwise regression is to identify the subset of predictors that best explain the response variable. In this case, the response variables are TARGET_AMT, KIDSDRIV, AGE, HOMEKIDS, YOJ, INCOME, HOME_VAL, TRAVTIME, BLUEBOOK, TIF, OLDCLAIM, CLM_FREQ, MVR_PTS, and CAR_AGE. The model selects the best subset of these predictors by iteratively adding or removing variables based on statistical criteria, in this case the Akaike Information Criterion (AIC).
 
@@ -387,13 +444,13 @@ The final model contains the variables ARGET_AMT, HOMEKIDS, INCOME, HOME_VAL, BL
 
 To evaluate the performance of a machine learning model, it is important to split the data into training and test sets. The training set is used to train the model, while the test set is used to evaluate how well the model generalizes to new, unseen data.
 
-```{r}
+```{r seung-model}
 library(MASS)
 
 set.seed(333)
-trainIndex <- sample(1:nrow(rawTrainData), round(0.7*nrow(rawTrainData)), replace = FALSE)
-trainData <- rawTrainData[trainIndex, ]
-testData <- rawTrainData[-trainIndex, ]
+trainIndex <- sample(1:nrow(trainClean), round(0.7*nrow(trainClean)), replace = FALSE)
+trainData <- trainClean[trainIndex, ]
+testData <- trainClean[-trainIndex, ]
 
 
 trainData <- na.omit(trainData)
@@ -409,6 +466,7 @@ predictions <- predict(model, testData)
 
 cor(predictions, testData$TARGET_FLAG)
 ```
+
 The model's coefficient of 0.6015157 represents the correlation between the predicted values and actual values of the target variable, which is the probability of a car insurance claim being filed (TARGET_FLAG). A value of 0.60 indicates a moderate positive correlation between the predicted and actual values.
 
 The model's coefficients for INCOME and HOME_VAL are negative, indicating that as these variables decrease, the predicted probability of a car insurance claim being filed (TARGET_FLAG) increases. This observation seems to contradict the expectation that individuals with higher incomes and more valuable homes would be safer drivers and thus less likely to file insurance claims.
@@ -416,7 +474,67 @@ The model's coefficients for INCOME and HOME_VAL are negative, indicating that a
 If the result is counter intuitive, it might be worthwhile to conduct another experiment to verify the accuracy of the outcome.
 
 
-# Model Building
+## Anthony's First Models
+
+Of the models we build, we will build our first two models after an exhaustive outlier cleaning. It seems that both models favor managers for a lower insurance rate, interestingly enough. Additionally, the type of car has a significant impact on the amount. Also, both models agree that married couples are charged significantly lower rates, whereas this is even worse in the event that an unmarried person is also a single parent. Finally, both models agree that it is extremely significant whether the drivers are in urban or rural areas, such that urban drivers get charged around $1500 more than their rural counterparts.
+
+```{r a-model1, eval=FALSE, warning=FALSE}
+.DataTransformsPipeline <- function(df, removeTargetCol = c("TARGET_FLAG", "TARGET_AMT")[1], nonLinearCols) {
+  RemoveCols(df, removeTargetCol) %>%
+    CoerceOutliersToNa(4) %>%
+      CoerceOutliersToNa(4) %>%
+        CoerceOutliersToNa(4) %>%
+          CoerceOutliersToNa(3) %>%
+            { dplyr::coalesce(
+              RemoveCols(transformedData, nonLinearCols, invert = T),
+              .
+            )} %>%
+              dplyr::select(colnames(df)) %>%
+                mice::mice(., method = "lasso.norm", printFlag = FALSE) %>%
+                  mice::complete(.)
+}
+```
+
+```{r a-model2, eval=FALSE, warning=FALSE}
+lmMockup = .DataTransformsPipeline(
+  transformedData,
+  "TARGET_FLAG",
+  c("TARGET_FLAG", "TARGET_AMT", "OLDCLAIM", nominalCols, binomialCols)
+) %>%
+  RemoveCols("TARGET_FLAG") %>%
+    { do.call("lm", list(formula = TARGET_AMT ~ ., data = .)) }
+
+lmModel = MASS::stepAIC(lmMockup, direction = "both", trace = FALSE)
+funnyModel = lmModel
+
+saveRDS(funnyModel, paste0(here::here("data/models"), "/funnyModel.rds"))
+```
+
+```{r a-model3, eval=FALSE, warning=FALSE}
+lmMockupAlt = .DataTransformsPipeline(
+  cleanData,
+  "TARGET_FLAG",
+  c("TARGET_FLAG", "TARGET_AMT", "OLDCLAIM", nominalCols, binomialCols)
+) %>%
+  RemoveCols("TARGET_FLAG") %>%
+    { do.call("lm", list(formula = TARGET_AMT ~ ., data = .)) }
+
+lmModelAlt = MASS::stepAIC(lmMockupAlt, direction = "both", trace = FALSE)
+smallerModel = lmModelAlt
+
+saveRDS(smallerModel, paste0(here::here("data/models"), "/smallerModel.rds"))
+```
+
+```{r}
+funnyModel = readRDS(paste0(here::here("data/models"), "/funnyModel.rds"))
+smallerModel = readRDS(paste0(here::here("data/models"), "/smallerModel.rds"))
+
+### Subsets the model coefficients to those of pvalue below a value
+summary.lm(funnyModel)$coefficients %>%
+  .[.[,4] < .05, ]
+```
+
+## Alice's Models
 
 # Selecting Best Model
 
