@@ -27,16 +27,16 @@ rawTestData = LoadDataElseWeb("insurance-evaluation-data.csv", "../data/")
 
 # Abstract
 
-We discuss the challenges from evaluating insurance data, asserting whether a car is involved in a crash and then how expensive the claim would be. Mainly, we discuss imputation but our end models are not able to effectively predict car crashes due to overfitting and high false positives. Our linear regression models pull some insights regarding the effects of marital status and others on claim costs.
+We discuss the challenges from evaluating insurance data, assessing whether a car is involved in a crash and then how expensive the claim would be. Our goal is to create a logistic regression model, which predicts the binary value of whether or not a car has been in a crash (`TARGET_FLAG`), as well as a linear regression, which predicts the amount of the claim (`TARGET_AMT`). Our linear regression models pull some insights regarding the effects of marital status and others on claim costs. MORE TK.
 
-# Data Exploration & Preparation
+# Part 1. Data Exploration 
 
 The data has 23 features and 2 target variables that we wish to predict. As part of our predictive analytics, first we will decide if the car that belongs to a license plate has been in a crash before. Second, we will determine how much the cost of the crash was if they were.
 
-- TARGET_FLAG: Was Car in a crash? 1=YES 0=NO None
-- TARGET_AMT: If car was in a crash, what was the cost
+- TARGET_FLAG: Was car in a crash? 1=YES 0=NO None
+- TARGET_AMT: If car was in a crash, what was the cost of the damage?
 
-There are some general myths related to driving that may skew our view about what we expect. How much of it is true? Personally, I think that senior drivers get into more crashes than those younger but what if that's not the case? Provided below is a quick data dictionary of the features we will be measuring.
+There are some general myths related to driving that may skew our view about what we expect. How much of it is true? Provided below is a quick data dictionary of the features we will be measuring.
 
 - AGE: Age of Driver
 - BLUEBOOK: Value of Vehicle
@@ -146,7 +146,58 @@ head(cleanData)
 
 ## Visulization of the data set
 
-Our features span a multitude of different distributions. Many of them are normal, others are binomial, and others are nominal. How we handle each feature will thus influence future analysis. 
+Our features span a multitude of different distributions.  None of them are strictly normal unless `0` values are excluded, although `AGE` comes closest. It is unclear in the data if `0` is equivalent to missing data, or whether some car owners have `0` income (maybe students?) or a `0` home value (perhaps renters?). Several are categorical or binomial. 
+
+```{r plot_all, warning=FALSE message=FALSE}
+# list of continuous vars
+contVars <- c(
+  "TARGET_AMT",
+  "AGE",
+  "BLUEBOOK",
+  "CAR_AGE",
+  "HOME_VAL",
+  "INCOME",
+  "TIF",
+  "TRAVTIME",
+  "YOJ"
+)
+
+# list of categorical, discrete, or binomial vars
+factorVars <- c(
+  "TARGET_FLAG",
+  "CAR_TYPE",
+  "CAR_USE",
+  "CLM_FREQ",
+  "EDUCATION",
+  "HOMEKIDS",
+  "JOB",
+  "KIDSDRIV",
+  "MSTATUS",
+  "MVR_PTS",
+  "OLDCLAIM",
+  "PARENT1",
+  "RED_CAR",
+  "REVOKED",
+  "SEX",
+  "URBANICITY"
+)
+# Loop through each continuousc olumn in the data and create a histogram plot 
+for (col in contVars) {
+  plot <- ggplot(cleanData, aes({{col}})) + 
+          geom_histogram()
+  print(plot)
+}
+
+# Loop through each discrete or categorical var
+
+#TK
+
+
+
+
+
+```
+
 
 ```{r dist}
 ### Plots the distribution of each variable
@@ -157,8 +208,6 @@ RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
 ```
 
 ## Visualization of Correlation
-
-According to this correlation matrix, all of the features are not strongly correlated to each other. With this in mind, we will go forward and assume that potentially every feature is a principal component and we will not exclude any until further downstream analysis is conducted.
 
 ```{r corr}
 ### Develops a correlation plot for all numeric values
@@ -172,9 +221,6 @@ RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
 
 ## Missing values
 The rawData data frame contains 970 missing values, representing 948 out of 8161 observations. Most observations wiht
-```{r}
-colSums(is.na(rawData)) %>% sum() #total missing values
-The raw data frame contains `r sum(colSums(is.na(rawData)))`` missing values, representing `r sum(!complete.cases(rawData))` out of `r nrow(rawData)` observations.
 
 ```{r missing, eval=FALSE}
 ### Counts values with missing data
@@ -188,7 +234,7 @@ sum(!complete.cases(rawData)) #observations with missing data
 ```
 
 
-```{r clean-func2, eval=FALSE},
+```{r clean-func2, eval=FALSE}
 ## NOTE TO TEAM: we don't have to use this code, but here is another version that uses more built-in functions
 ## I also see some advantages to leaving the binary values as factors so we don't predict impossible values
 
