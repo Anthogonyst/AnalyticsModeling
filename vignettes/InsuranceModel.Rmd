@@ -146,7 +146,7 @@ head(cleanData)
 
 ## Visulization of the data set
 
-Our features span a multitude of different distributions.  None of them are strictly normal unless `0` values are excluded, although `AGE` comes closest. It is unclear in the data if `0` is equivalent to missing data, or whether some car owners have `0` income (maybe students?) or a `0` home value (perhaps renters?). Several are categorical or binomial. 
+Our features span a multitude of different distributions.  None of them are strictly normal unless `0` values are excluded, although `AGE` comes closest. It is unclear in the data if `0` is equivalent to missing data, or whether some car owners have `0` income (many of whom are coded as students or homemakers) or a `0` home value (perhaps renters?). Several are categorical(e.g., `JOB`), ordinal (e.g., `EDUCATION`) or binomial (e.g., `RED_CAR`). 
 
 ```{r plot_all, warning=FALSE message=FALSE}
 # list of continuous vars
@@ -161,6 +161,10 @@ contVars <- c(
   "TRAVTIME",
   "YOJ"
 )
+
+ggplot(cleanData, aes(x=INCOME)) +
+  geom_freqpoly(aes(color=JOB))
+
 
 # list of categorical, discrete, or binomial vars
 factorVars <- c(
@@ -181,19 +185,6 @@ factorVars <- c(
   "SEX",
   "URBANICITY"
 )
-# Loop through each continuousc olumn in the data and create a histogram plot 
-for (col in contVars) {
-  plot <- ggplot(cleanData, aes({{col}})) + 
-          geom_histogram()
-  print(plot)
-}
-
-# Loop through each discrete or categorical var
-
-#TK
-
-
-
 
 
 ```
@@ -207,17 +198,81 @@ RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
   PlotVarDistribution(showBoxPlot = TRUE)
 ```
 
-## Visualization of Correlation
+## Correlation
+
+Several of the continuous variables are show to correlated. We see a strong correlation between `INCOME`, `HOME_VAL`, `BLUEBOOK`, and `CAR_AGE`, which intuitively makes sense as higher income people are more likley to have more expensive houses, and newer, more expensive cars.  
+
+`INCOME` and `HOME_VAL` have the strongest correlation, with a correlation coefficient of 0.58. It is unlikely that both of these features should be used in the final model.
+
 
 ```{r corr}
 ### Develops a correlation plot for all numeric values
 # See common-helpers.R
-RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
+RemoveCols(cleanData, factorVars) %>% #remove categorical or binary variables
   .[, sapply(., is.numeric)] %>%
     stats::cor(., use = "na.or.complete") %>%
       # See common-stats.R
-      PlotCorrEllipse(.)
+      PlotCorrEllipse(.) 
+
+# Numeric corrlational matrix for continuous variables
+cleanData %>% select(all_of(contVars)) %>% cor(use = "complete.obs") %>% round(2)
+
+# drill down into variables identified as signifincantly correlated (corr > 0.4)
+## Income X HOME_VAL
+plot(cleanData %>% select(INCOME, BLUEBOOK, HOME_VAL, CAR_AGE))
+
+
 ```
+Categorical data correlations must be calculated differently. Purely categorical data correlation can be assessed using different methods. One method to compare correlation between a continuous and binomial feauture is to determine if a logistic model can be developed with a significant P value.
+
+As shown below, many of the categorical variables are highly correlated. For example, `RED_CAR` is highly predictive of `SEX` == M. Martial status and being a single parent are (of course) mechanistically connected (all single parents are unmarried). 
+
+```{r}
+# Define a list of binomial features
+
+binomials <- c(
+  "TARGET_FLAG",
+  "PARENT1",
+  "MSTATUS",
+  "RED_CAR",
+  "REVOKED",
+  "SEX"
+)
+
+# relevel M/F as binomial
+binomialDF <- cleanData %>% mutate(
+  SEX = SEX %>% plyr::mapvalues(from = c("M", "F"), to = c(1, 0))
+) %>% select
+
+# Define a function to test correlation between binomial features and other features
+categorical_corr_test <- function(df, cols) {
+  
+  for (col in cols){
+    
+    # select column
+    catVar <- df[[{{col}}]]
+    
+    # p values we will fill in
+    p_vals <- rep(NA, ncol(df)) 
+
+    # Loop through every remaining column
+    for (j in 1:(ncol(df))) {
+	    s <- summary (glm(catVar ~ df[, j], family = binomial))
+	    p_vals[j] <- s$coefficients[2,4]
+    }
+
+    results <- cbind(names(df), p_vals) %>% subset(p_vals < 0.05)
+    
+    print(col)
+    print(results)
+  }
+}
+
+categorical_corr_test(binomialDF, binomials)
+```
+We can also visualize each variable in comparison to the target.
+
+
 
 ## Missing values
 The rawData data frame contains 970 missing values, representing 948 out of 8161 observations. Most observations wiht
@@ -234,7 +289,7 @@ sum(!complete.cases(rawData)) #observations with missing data
 ```
 
 
-```{r clean-func2, eval=FALSE}
+```{r clean-func2, eval=TRUE}
 ## NOTE TO TEAM: we don't have to use this code, but here is another version that uses more built-in functions
 ## I also see some advantages to leaving the binary values as factors so we don't predict impossible values
 
@@ -280,7 +335,10 @@ df <- as.data.frame(lapply(df, remove_z_prefix))
 summary(df)
 
 # Rename data set as used elsewhere in the code
-cleanData <- df
+trainData <- df
+
+# Rename data set as used elsewhere in the code
+#cleanData <- df
 ```
 
 ## Missing values
@@ -294,7 +352,9 @@ sum(!complete.cases(cleanData)) #observations with missing data
 ("Number of missing values by feature")
 colSums(is.na(cleanData))
 ```
-A good rule of thumb is to drop any feature with more than 80% missing values -- that is not the case with any features here. The remaining options are to:
+A good rule of thumb is to drop any feature with more than 80% missing values -- that is not the case with any features here. 
+
+The remaining options are to:
 1) Drop rows with missing values
 2) Infer missing values
 
@@ -302,12 +362,10 @@ In order to decide which course to take we should first determine if there is an
 
 The following variables in the data set have missing values: **AGE** (6), **YOJ** (454), **INCOME** (445), **HOME_VAL** (464) and **CAR_AGE**(510). 
 
-First, we will drop the missng **AGE** rows, then we will test each remaining variable for correlation with the other features in the data set to determin how best to handle.
+First, we will drop the missing **AGE** rows, then we will test each remaining variable for correlation with the other features in the data set to determine how best to handle.
 
 
-```{r}
-df <- cleanData %>% tidyr::drop_na(AGE)
-```
+
 
 
 
@@ -315,6 +373,8 @@ df <- cleanData %>% tidyr::drop_na(AGE)
 # Define list of columns to test
 cols <- c("YOJ", "HOME_VAL", "INCOME", "CAR_AGE")
 
+#drop AGE nas
+df <- trainData %>% tidyr::drop_na(AGE)
 
 # Define a function to test correlation with missingness and other features
 MAR_test <- function(df, cols) {
@@ -355,10 +415,10 @@ MAR_test(df, cols)
 
 ```
 
-All the remaining features with missing values have correlation with at least one other feautre, except **CAR_AGE**. **CAR_AGE** can be said to plausibly be missing completely at random, and so those rows can also be dropped without any expectation of affecting the model performane.
+All the remaining features with missing values have correlation with at least one other feature, except **CAR_AGE**. **CAR_AGE** can be said to plausibly be missing completely at random, and so those rows can also be dropped without any expectation of affecting the model performane.
 
 ```{r drop_missing_car_age}
-df <- cleanData %>% tidyr::drop_na(AGE, CAR_AGE)
+trainData <- df %>% tidyr::drop_na(AGE, CAR_AGE)
 ```
 The remaining features will require imputed values.
 
@@ -699,19 +759,19 @@ lmTables = lapply(list(clm, zlm, tlm, ilm, flm), function(x) { x[[3]][[1]] }) %>
 olm = cleanData %>%
   RemoveCols(., names(sapply(cleanData, is.factor) %>% .[.])) %>%
     RemoveCols("KIDSDRIV") %>%
+    CoerceOutliersToNa(4) %>%
       CoerceOutliersToNa(4) %>%
-        CoerceOutliersToNa(4) %>%
-          CoerceOutliersToNa(4) %>%
-            CoerceOutliersToNa(3) %>%
-              mice::mice(., method = "pmm", printFlag = FALSE) %>%
-                mice::complete(.) %>%
-                  cbind(., cleanData[, sapply(cleanData, is.factor)], cleanData["KIDSDRIV"]) %>%
-                    InsuranceTransforms(.) %>%
-                      dplyr::select((colnames(cleanData) %>% .[! . %in% c("JOB", "CLM_FREQ")]), dplyr::everything()) %>%
-                        RemoveCols(c("INDEX", "JOB")) %>%
-                          mice::mice(., method = "lasso.norm", printFlag = FALSE) %>%
-                            mice::complete(.) %>%
-                              ModelInsurance(.)
+      CoerceOutliersToNa(4) %>%
+      CoerceOutliersToNa(3) %>%
+      mice::mice(., method = "pmm", printFlag = FALSE) %>%
+      mice::complete(.) %>%
+      cbind(., cleanData[, sapply(cleanData, is.factor)], cleanData["KIDSDRIV"]) %>%
+      InsuranceTransforms(.) %>%
+      dplyr::select((colnames(cleanData) %>% .[! . %in% c("JOB", "CLM_FREQ")]), dplyr::everything()) %>%
+      RemoveCols(c("INDEX", "JOB")) %>%
+      mice::mice(., method = "lasso.norm", printFlag = FALSE) %>%
+      mice::complete(.) %>%
+      ModelInsurance(.)
 ```
 
 ```{r lm-assist, eval=FALSE}
@@ -739,7 +799,7 @@ logCrashTables
 lmCrashTables
 ```
 
-# Selecting Best Model
+# Selecting Best Linear Regression Model
 
 ```{r}
 testClean = CleanInsuranceStrings(rawTestData) %>%
@@ -755,8 +815,15 @@ results = data.frame(
     write.csv(paste0(here::here("docs"), "/insurance-quotes-", substring(Sys.time(), 1, 10), ".csv"), row.names = FALSE)
 ```
 
+# Selecting Best Logistic Regression Model
+Need to add a section here about the best logistic model.
+
 # Conclusions and Suggestions
+
 # References
+
+https://www.statology.org/correlation-between-categorical-variables/
+
 # Appendix
 
 ```{r, echo=TRUE, class.output="foldable"}
