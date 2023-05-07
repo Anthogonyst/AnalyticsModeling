@@ -429,33 +429,15 @@ imputeData$YOJ[is.na(imputeData$YOJ)] <- rounded_YOJ
 
 ### Income
 
-Build the linear regression model with AGE and YOJ as the predictors and INCOME as the response and predict the missing values of INCOME based on the values of AGE and YOJ. insert the predicted values of INCOME into the original dataframe.
-
+**INCOME** missingness is similarly related to **BLUEBOOK**, **MVR_PTS**, and **URBANICITY**. We can impute based on a linear regression from these three variables.
 ```{r impute-income}
 
-#number of years associated with education levels
-edYears <- c(
-    12,
-    16,
-    18,
-    20 #avg. years for phd = 8 years
-)
-
-ed_levels <- c(
-   "High School",
-   "Bachelors",  
-   "Masters",
-   "PhD" 
-)
-
-# Subset the data with missing values of YOJ, replace education levels with years
-missing_YOJ <- subset(imputeData, is.na(YOJ)) %>%
-  mutate(EDUCATION = EDUCATION %>% plyr::mapvalues(from=ed_levels, to=edYears))
+# Subset the data with missing values of INCOME
+missing_INCOME <- subset(imputeData, is.na(INCOME))
     
-    
-lm_model <- lm(INCOME ~ AGE + YOJ, data = imputeData)
+lm_model_INC <- lm(INCOME ~ BLUEBOOK + MVR_PTS + URBANICITY, data = imputeData)
 
-predicted_INCOME <- predict(lm_model, newdata = missing_INCOME)
+predicted_INCOME <- predict(lm_model_INC, newdata = missing_INCOME)
 
 rounded_INCOME <- round(predicted_INCOME, digits = 0)
 imputeData[is.na(imputeData$INCOME),]$INCOME <- rounded_INCOME
