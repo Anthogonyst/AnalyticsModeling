@@ -8,18 +8,19 @@ output:
 ---
 
 ```{r setup, include=FALSE, warning=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE)
 (function() { set.seed(8675309) })()
 invisible(lapply(list.files(here::here("R"), "\\.R$", full.names = TRUE), source))
 
 library(magrittr)
 library(here)
 library(reshape2)
-library(dplyr)
-library(ggplot2)
 library(ggrepel)
 library(ModelMetrics)
-library(readr)
+library(tidyverse)
+library(tidyr)
+library(corrplot)
+library(glmnet)
 
 rawData = LoadDataElseWeb("insurance_training_data.csv", "../data/") 
 rawTestData = LoadDataElseWeb("insurance-evaluation-data.csv", "../data/")
@@ -148,7 +149,7 @@ head(cleanData)
 
 Our features span a multitude of different distributions.  None of them are strictly normal unless `0` values are excluded, although `AGE` comes closest. It is unclear in the data if `0` is equivalent to missing data, or whether some car owners have `0` income (many of whom are coded as students or homemakers) or a `0` home value (perhaps renters?). Several are categorical(e.g., `JOB`), ordinal (e.g., `EDUCATION`) or binomial (e.g., `RED_CAR`). 
 
-```{r plot_all, warning=FALSE message=FALSE}
+```{r categorize}
 # list of continuous vars
 contVars <- c(
   "TARGET_AMT",
@@ -157,28 +158,28 @@ contVars <- c(
   "CAR_AGE",
   "HOME_VAL",
   "INCOME",
+  "OLDCLAIM",
   "TIF",
   "TRAVTIME",
   "YOJ"
 )
 
-ggplot(cleanData, aes(x=INCOME)) +
-  geom_freqpoly(aes(color=JOB))
-
-
-# list of categorical, discrete, or binomial vars
+# list of categorical, discrete vars
 factorVars <- c(
-  "TARGET_FLAG",
   "CAR_TYPE",
-  "CAR_USE",
   "CLM_FREQ",
   "EDUCATION",
   "HOMEKIDS",
   "JOB",
   "KIDSDRIV",
+  "MVR_PTS"
+)
+
+# list of categorical, discrete vars
+binomials <- c(
+  "CAR_USE",
+  "TARGET_FLAG",
   "MSTATUS",
-  "MVR_PTS",
-  "OLDCLAIM",
   "PARENT1",
   "RED_CAR",
   "REVOKED",
@@ -186,11 +187,50 @@ factorVars <- c(
   "URBANICITY"
 )
 
-
 ```
 
 
-```{r dist}
+```{r}
+### Plots the distribution of each variable
+##continuous vars
+nViz <- cleanData %>% tidyr::drop_na()
+nViz %>% 
+  select_if(is.numeric) %>%                     # Keep only numeric columns
+  gather() %>%                             # Convert to key-value pairs
+  ggplot(aes(value)) +                     # Plot the values
+    facet_wrap(~ key, scales = "free") +   # In separate panels
+    geom_density() 
+
+discreteVarsLong <- nViz %>% dplyr::select(all_of(factorVars)) %>% gather()
+
+#discrete vars
+ggplot(data = discreteVarsLong) +
+  geom_bar(mapping = aes(x = as.factor(value), fill = as.factor(value)), show.legend = FALSE) + 
+  facet_wrap( ~ key, scales = "free") + 
+  theme(axis.text.x = element_text(angle=90, vjust=.5, hjust=1))
+
+
+zero1 <- c(0,1)
+releveledBi <- nViz %>% 
+  dplyr::select(all_of(binomials)) %>%
+  mutate(
+      MALE = SEX %>% plyr::mapvalues(from = c("F", "M"), to = zero1),
+      COMM_CAR = CAR_USE %>% plyr::mapvalues(from = c("Private", "Commercial"), to = zero1),
+      URBAN = URBANICITY %>% plyr::mapvalues(from=c("Highly Rural/ Rural", "Highly Urban/ Urban"), to=zero1)
+    ) %>%
+  dplyr::select(-CAR_USE, -URBANICITY, -SEX)
+
+
+#binomial vars
+ggplot(data = releveledBi %>% gather(key = "key", value="value", -TARGET_FLAG)) +
+  geom_bar(mapping = aes(x = key, fill=value), show.legend = TRUE, position = "fill") + 
+  facet_grid(vars(TARGET_FLAG)) + 
+  theme(axis.text.x = element_text(angle=90, vjust=.5, hjust=1))+
+  ylab("Target Flag")
+
+```
+
+```{r dist, eval=FALSE}
 ### Plots the distribution of each variable
 # See common-helpers.R
 RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
@@ -200,27 +240,27 @@ RemoveCols(cleanData, c("INDEX", "TARGET_FLAG", "TARGET_AMT")) %>%
 
 ## Correlation
 
-Several of the continuous variables are show to correlated. We see a strong correlation between `INCOME`, `HOME_VAL`, `BLUEBOOK`, and `CAR_AGE`, which intuitively makes sense as higher income people are more likley to have more expensive houses, and newer, more expensive cars.  
+Several of the continuous variables are show to correlated. We see a strong correlation between `INCOME`, `HOME_VAL`, `BLUEBOOK`, and `CAR_AGE`, which intuitively makes sense as higher income people are more likely to have more expensive houses, and newer, more expensive cars.  
 
 `INCOME` and `HOME_VAL` have the strongest correlation, with a correlation coefficient of 0.58. It is unlikely that both of these features should be used in the final model.
 
 
 ```{r corr}
-### Develops a correlation plot for all numeric values
-# See common-helpers.R
-RemoveCols(cleanData, factorVars) %>% #remove categorical or binary variables
-  .[, sapply(., is.numeric)] %>%
-    stats::cor(., use = "na.or.complete") %>%
-      # See common-stats.R
-      PlotCorrEllipse(.) 
-
-# Numeric corrlational matrix for continuous variables
+# Numeric correlational matrix for continuous variables
 cleanData %>% select(all_of(contVars)) %>% cor(use = "complete.obs") %>% round(2)
+
+# drill down into variables identified as signifincantly correlated (corr > 0.4)
+cleanData %>% select(INCOME, BLUEBOOK, HOME_VAL, CAR_AGE) %>% cor(use = "pairwise.complete.obs") %>% round(2)
 
 # drill down into variables identified as signifincantly correlated (corr > 0.4)
 ## Income X HOME_VAL
 plot(cleanData %>% select(INCOME, BLUEBOOK, HOME_VAL, CAR_AGE))
 
+
+### Develops a correlation plot for all numeric values
+rawDatanum <- cleanData %>% select(all_of(contVars)) %>% drop_na()
+
+corrplot(cor(rawDatanum), method="square")
 
 ```
 Categorical data correlations must be calculated differently. Purely categorical data correlation can be assessed using different methods. One method to compare correlation between a continuous and binomial feauture is to determine if a logistic model can be developed with a significant P value.
@@ -228,7 +268,7 @@ Categorical data correlations must be calculated differently. Purely categorical
 As shown below, many of the categorical variables are highly correlated. For example, `RED_CAR` is highly predictive of `SEX` == M. Martial status and being a single parent are (of course) mechanistically connected (all single parents are unmarried). 
 
 ```{r}
-# Define a list of binomial features
+#Define a list of binomial features
 
 binomials <- c(
   "TARGET_FLAG",
@@ -240,109 +280,37 @@ binomials <- c(
 )
 
 # relevel M/F as binomial
-binomialDF <- cleanData %>% mutate(
-  SEX = SEX %>% plyr::mapvalues(from = c("M", "F"), to = c(1, 0))
-) %>% select
+binomialDF <- cleanData %>% 
+  select(all_of(binomials)) %>%
+  mutate(
+  SEX = SEX %>% plyr::mapvalues(from = c("M", "F"), to = c(0, 1)) %>% as.numeric()
+) 
 
-# Define a function to test correlation between binomial features and other features
-categorical_corr_test <- function(df, cols) {
-  
-  for (col in cols){
-    
-    # select column
-    catVar <- df[[{{col}}]]
-    
-    # p values we will fill in
-    p_vals <- rep(NA, ncol(df)) 
 
-    # Loop through every remaining column
-    for (j in 1:(ncol(df))) {
-	    s <- summary (glm(catVar ~ df[, j], family = binomial))
-	    p_vals[j] <- s$coefficients[2,4]
-    }
-
-    results <- cbind(names(df), p_vals) %>% subset(p_vals < 0.05)
-    
-    print(col)
-    print(results)
-  }
-}
-
-categorical_corr_test(binomialDF, binomials)
+library(ggcorrplot)
+model.matrix(~0+., data=binomialDF) %>% 
+  cor(use="pairwise.complete.obs") %>% 
+  ggcorrplot(show.diag=FALSE, lab=TRUE, lab_size=2)
 ```
-We can also visualize each variable in comparison to the target.
 
 
 
 ## Missing values
-The rawData data frame contains 970 missing values, representing 948 out of 8161 observations. Most observations wiht
+The rawData data frame contains 970 missing values, representing 948 out of 8161 observations. 
 
-```{r missing, eval=FALSE}
+```{r missing, eval=TRUE}
 ### Counts values with missing data
 #nrow(rawData[is.na(rawData),]) 
 
 ### total missing values
-colSums(is.na(rawData)) %>% sum()
+print("Total Missing Values")
+colSums(is.na(rawData)) %>% sum(
+)
 
 ### Counts rows with missing data
+print("Total Rows with Missing Values")
 sum(!complete.cases(rawData)) #observations with missing data
 ```
-
-
-```{r clean-func2, eval=TRUE}
-## NOTE TO TEAM: we don't have to use this code, but here is another version that uses more built-in functions
-## I also see some advantages to leaving the binary values as factors so we don't predict impossible values
-
-# Define a list of columns formatted as currency
-hasDollars <- c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM") 
-
-# Parse the numeric data in those columns to remove excess characters, e.g. $, using readr::parse_numbers
-df <- rawData %>% mutate(across(hasDollars, readr::parse_number))
-
-
-# Next, classify characters as factors and relevel as appropriate
-df <- df %>% unclass () %>% as.data.frame(stringsAsFactors = TRUE) %>%
-  mutate(
-    TARGET_FLAG = as.factor(TARGET_FLAG),                         # Set target as factor
-    RED_CAR = forcats::fct_recode(RED_CAR,"Yes"="yes", "No"="no") # Clean up case
-  ) 
-
-## Define a function to remove "<" or any other non-alphanumeric prefix from levels
-remove_non_alphanum_prefix <- function(x) {
-  levels(x) <- gsub("^[^[:alnum:]]+",   # This removes any non alphanumeric character from the beginning of a factor level
-                    "",                 # and replaces it with an empty string
-                    levels(x))          # given a vector set as factor 
-  return(x)                             # and then returns the feature.        
-}
-
-## Define a function to remove "z_" or "Z_" prefix from levels
-
-remove_z_prefix <- function(x) {
-  levels(x) <- gsub("z_",               # This removes any "^z_" from the beginning of a factor level
-                    "",                 # and replaces it with an empty string
-                    levels(x),        
-                    ignore.case = TRUE  # ignoring case        
-                    ) 
-  return(x)                             # and then returns the feature.        
-}
-
-
-## Apply the functions to all columns of the data frame
-df <- as.data.frame(lapply(df, remove_non_alphanum_prefix))
-df <- as.data.frame(lapply(df, remove_z_prefix))
-
-# Summarize
-summary(df)
-
-# Rename data set as used elsewhere in the code
-trainData <- df
-
-# Rename data set as used elsewhere in the code
-#cleanData <- df
-```
-
-## Missing values
-The rawData data frame contains 2405 missing values, representing 2116 out of 8161 observations. This is too many to simply drop all rows with missing data; however -- 'AGE' has only 6 missing variables so in that case the most straightforward approach is to drop those rows.
 
 ```{r missing-cols}
 print("Total missing values")
@@ -360,21 +328,18 @@ The remaining options are to:
 
 In order to decide which course to take we should first determine if there is any correlation between features with missing values, or if values are missing at random. Because several of these features are numeric, we will first need to convert the features to the appropriate data type in order to determine if there is a correlation.
 
-The following variables in the data set have missing values: **AGE** (6), **YOJ** (454), **INCOME** (445), **HOME_VAL** (464) and **CAR_AGE**(510). 
+The following variables in the data set have missing values: **AGE** (6), **YOJ** (454), **INCOME** (445), **HOME_VAL** (464) and **CAR_AGE**(510). **JOB** also has 526 "unspecified" values which we will recode as NA. 
 
-First, we will drop the missing **AGE** rows, then we will test each remaining variable for correlation with the other features in the data set to determine how best to handle.
-
-
-
-
+First, we will drop the missing **AGE** rows, then we will test each remaining variable for correlation with the other features in the data set to determine how best to handle. 
 
 
 ```{r, warning=FALSE}
 # Define list of columns to test
-cols <- c("YOJ", "HOME_VAL", "INCOME", "CAR_AGE")
+cols <- c("YOJ", "HOME_VAL", "INCOME", "CAR_AGE", "JOB")
 
 #drop AGE nas
-df <- trainData %>% tidyr::drop_na(AGE)
+naTestDF <- cleanData %>% tidyr::drop_na(AGE) %>% select(-INDEX)
+naTestDF["JOB"][naTestDF["JOB"]==""] <- NA #replace "Unspecified wiht NA
 
 # Define a function to test correlation with missingness and other features
 MAR_test <- function(df, cols) {
@@ -391,8 +356,7 @@ MAR_test <- function(df, cols) {
   for (col in cols){
     # Create a var to hold the releveled values
     is_missing <- relevel_missing(subset(df, select=col)) %>% unlist()
-    print(class(is_missing))
-    
+
     # p values we will fill in
     p_vals <- rep(NA, ncol(df)) 
 
@@ -404,41 +368,63 @@ MAR_test <- function(df, cols) {
 
     results <- cbind(names(df), p_vals) %>% subset(p_vals < 0.05)
     
+    print("")
+    print("Features with missing values")
     print(col)
+    print("Features correlated with missingness")
     print(results)
   }
 }
 
-
-
-MAR_test(df, cols)
+MAR_test(naTestDF, cols)
 
 ```
 
-All the remaining features with missing values have correlation with at least one other feature, except **CAR_AGE**. **CAR_AGE** can be said to plausibly be missing completely at random, and so those rows can also be dropped without any expectation of affecting the model performane.
+All the remaining features with missing values have correlation with at least one other feature, except **CAR_AGE** and **JOB**. These variables can therefore be said to plausibly be missing completely at random, and so those rows can also be dropped without any expectation of affecting the model performance.
 
 ```{r drop_missing_car_age}
-trainData <- df %>% tidyr::drop_na(AGE, CAR_AGE)
+trainData <- cleanData 
+trainData["JOB"][cleanData["JOB"]==""] <- NA 
+trainData <- trainData %>%  tidyr::drop_na(AGE, CAR_AGE, JOB) 
 ```
 The remaining features will require imputed values.
 
 
 ### YOJ
+YOJ missingness is strongly corelated to **EDUCATION**, which makes some sense as the more years of education someone has, the less time they have had to hold a job. One technique to deal with imputing values from an ordinal variable is to recode using some numerical values, which is straightforward to do as educaitonal attainment can be translated into years. 
 
-Build the linear regression model with AGE as the predictor and YOJ as the response and predict the missing values of YOJ based on the values of AGE. Insert the predicted values of YOJ into the original dataframe.
+```{r impute-YOJ}
 
-```{r impute-yoj}
-# Subset the data with missing values of YOJ
-missing_YOJ <- subset(imputeData, is.na(YOJ))
+#number of years associated with education levels
+edYears <- c(
+    12,
+    16,
+    18,
+    20 #avg. years for phd = 8 years
+)
 
-lm_model <- lm(YOJ ~ AGE, data = imputeData)
+ed_levels <- c(
+   "High School",
+   "Bachelors",  
+   "Masters",
+   "PhD" 
+)
 
-predicted_YOJ <- predict(lm_model, newdata = missing_YOJ)
+# Subset the data with missing values of YOJ, replace education levels with years
+missing_YOJ <- subset(cleanData, is.na(YOJ))
+  
+imputeYOJ_df <-cleanData %>%
+  mutate(EDUCATION = EDUCATION %>% plyr::mapvalues(from=ed_levels, to=edYears))
+
+#predict the missing values usng a linear regression using recoded data
+lm_model_YOJ <- lm(YOJ ~ EDUCATION, data = imputeYOJ_df)
+
+predicted_YOJ <- predict(lm_model_YOJ, 
+                         newdata = missing_YOJ %>%  
+                           mutate(EDUCATION = EDUCATION %>% plyr::mapvalues(from=ed_levels, to=edYears)))
 
 rounded_YOJ <- round(predicted_YOJ, digits = 0)
 imputeData$YOJ[is.na(imputeData$YOJ)] <- rounded_YOJ
-
-
 ```
 
 ### Income
@@ -446,9 +432,27 @@ imputeData$YOJ[is.na(imputeData$YOJ)] <- rounded_YOJ
 Build the linear regression model with AGE and YOJ as the predictors and INCOME as the response and predict the missing values of INCOME based on the values of AGE and YOJ. insert the predicted values of INCOME into the original dataframe.
 
 ```{r impute-income}
-# Subset the data with missing values of INCOME
-missing_INCOME <- subset(imputeData, is.na(INCOME))
 
+#number of years associated with education levels
+edYears <- c(
+    12,
+    16,
+    18,
+    20 #avg. years for phd = 8 years
+)
+
+ed_levels <- c(
+   "High School",
+   "Bachelors",  
+   "Masters",
+   "PhD" 
+)
+
+# Subset the data with missing values of YOJ, replace education levels with years
+missing_YOJ <- subset(imputeData, is.na(YOJ)) %>%
+  mutate(EDUCATION = EDUCATION %>% plyr::mapvalues(from=ed_levels, to=edYears))
+    
+    
 lm_model <- lm(INCOME ~ AGE + YOJ, data = imputeData)
 
 predicted_INCOME <- predict(lm_model, newdata = missing_INCOME)
@@ -675,7 +679,7 @@ InsuranceTransforms <- function(df) {
 
 Although new models were attempted with the new transforms and additional considerations, none of them successfully beat the existing model by a statistically significant margin. We compared each of the models using ANOVA and evaluated the LM models with MAE and RMSE, whereas the logistical models were compared using F1 and Accuracy metrics. Overall, we kept the previously accepted models due to the lack of advancement.
 
-```{r meh-model}
+```{r meh-model, eval=FALSE}
 ### Shuffles a vector to allow random picking simulations (not used)
 Shuffle <- function(x) {
   x[sample(seq_along(x))]
@@ -701,7 +705,6 @@ factorsData = cleanData %>%
         mice::mice(., method = "lasso.norm", printFlag = FALSE) %>%
           mice::complete(.)
 
-### Not my best work but my code quality degrades the closer the deadline is
 ModelInsurance <- function(df, seed = 8675309) {
   set.seed(seed)
 
